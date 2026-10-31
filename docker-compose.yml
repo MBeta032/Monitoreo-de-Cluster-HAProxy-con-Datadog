@@ -7,8 +7,21 @@ name: haproxy-telematicos
 services:
 
   # --- haproxy (Manuel) ---
-  # Se agrega en el Pull Request de la rama feature/haproxy, junto con haproxy/haproxy.cfg.
-
+  haproxy:
+    image: haproxy:2.6
+    container_name: haproxy
+    hostname: haproxy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - backend1
+      - backend2
+      - backend3
+    networks:
+      - cluster-net 
+  
   # --- backends (Esteban) ---
   # TEMPORALES: imagen traefik/whoami, solo para probar HAProxy mientras llegan los reales.
   # Esteban cambia "image" por sus backends. No cambiar nombres, hostname ni el puerto 5000.
