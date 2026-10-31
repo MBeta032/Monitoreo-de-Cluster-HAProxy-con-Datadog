@@ -1,0 +1,56 @@
+# docker-compose.yml - Proyecto 8: Monitoreo de clúster HAProxy con Datadog
+# Regla del grupo: cada integrante edita SOLO el bloque de su servicio.
+# Nombres de servicios, puertos, red y volumen son parte del contrato (README, sección 5).
+
+name: haproxy-telematicos
+
+services:
+
+  # --- haproxy (Manuel) ---
+  # Se agrega en el Pull Request de la rama feature/haproxy, junto con haproxy/haproxy.cfg.
+
+  # --- backends (Esteban) ---
+  # TEMPORALES: imagen traefik/whoami, solo para probar HAProxy mientras llegan los reales.
+  # Esteban cambia "image" por sus backends. No cambiar nombres, hostname ni el puerto 5000.
+  backend1:
+    image: traefik/whoami
+    container_name: backend1
+    hostname: backend1
+    environment:
+      WHOAMI_PORT_NUMBER: 5000
+      WHOAMI_NAME: backend1
+    networks:
+      - cluster-net
+
+  backend2:
+    image: traefik/whoami
+    container_name: backend2
+    hostname: backend2
+    environment:
+      WHOAMI_PORT_NUMBER: 5000
+      WHOAMI_NAME: backend2
+    networks:
+      - cluster-net
+
+  backend3:
+    image: traefik/whoami
+    container_name: backend3
+    hostname: backend3
+    environment:
+      WHOAMI_PORT_NUMBER: 5000
+      WHOAMI_NAME: backend3
+    networks:
+      - cluster-net
+
+  # --- datadog-agent (Jhon) ---
+
+  # --- artillery (Juan José) ---
+
+networks:
+  cluster-net:
+    name: cluster-net
+
+volumes:
+  # Cajón compartido donde HAProxy deja su socket y el Datadog Agent lo lee.
+  haproxy-socket:
+    name: haproxy-socket

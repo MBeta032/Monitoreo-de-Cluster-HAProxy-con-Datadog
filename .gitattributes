@@ -1,0 +1,8 @@
+# Todo archivo de texto se guarda y se descarga con finales de línea LF (estilo Linux),
+# porque los archivos se leen dentro de contenedores Linux. CRLF de Windows rompe configs y scripts.
+* text=auto eol=lf
+
+# Archivos binarios: Git no les cambia nada
+*.png binary
+*.jpg binary
+*.pdf binary

@@ -1,0 +1,11 @@
+# Secretos: el .env real NUNCA se sube (tiene la DD_API_KEY)
+.env
+.env.*
+!.env.example
+
+# Archivos basura que crean Windows, macOS y los editores
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+*.log
