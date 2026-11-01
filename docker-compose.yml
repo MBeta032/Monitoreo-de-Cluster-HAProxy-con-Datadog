@@ -13,6 +13,7 @@ services:
     hostname: haproxy
     ports:
       - "8080:8080"
+      - "127.0.0.1:8404:8404"
     volumes:
       - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
       - haproxy-socket:/var/lib/haproxy
