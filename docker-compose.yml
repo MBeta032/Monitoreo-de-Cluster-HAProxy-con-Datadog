@@ -15,6 +15,7 @@ services:
       - "8080:8080"
     volumes:
       - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - haproxy-socket:/var/lib/haproxy
     depends_on:
       - backend1
       - backend2
