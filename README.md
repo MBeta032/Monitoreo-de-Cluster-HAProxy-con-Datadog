@@ -50,7 +50,7 @@
 | Parte | Responsable | Estado |
 |---|---|:---:|
 | Infraestructura y HAProxy | Manuel | ✅ Listo |
-| Backends | Esteban | ⏳ Pendiente |
+| Backends | Esteban |  🚧 En curso  |
 | Datadog Agent | Jhon | ⏳ Pendiente |
 | Dashboard y monitores | Alan | ⏳ Pendiente |
 | Pruebas de carga | Juan José | ⏳ Pendiente |
