@@ -50,7 +50,7 @@
 | Parte | Responsable | Estado |
 |---|---|:---:|
 | Infraestructura y HAProxy | Manuel | ✅ Listo |
-| Backends | Esteban | ⏳ Pendiente |
+| Backends | Esteban |  🚧 En curso  |
 | Datadog Agent | Jhon | ⏳ Pendiente |
 | Dashboard y monitores | Alan | ⏳ Pendiente |
 | Pruebas de carga | Juan José | ⏳ Pendiente |
@@ -135,6 +135,10 @@ flowchart LR
 ├── haproxy/
 │   └── haproxy.cfg          # Configuración de HAProxy (montada de solo lectura)
 ├── backends/                # Código y Dockerfile de los backends
+│   ├── app.py              # Aplicación Flask instrumentada con Prometheus y logs JSON
+│   ├── gunicorn.conf.py    # Configuración de servidor de producción WSGI
+│   ├── requirements.txt    # Dependencias fijas del backend (Flask, prometheus-client, gunicorn)
+│   └── Dockerfile          # Imagen Python 3.14-slim, usuario no root y healthcheck nativo
 ├── datadog/
 │   ├── conf.d/haproxy.d/    # Integración HAProxy del Agent (conf.yaml)
 │   ├── dashboards/          # Dashboard exportado en JSON
@@ -357,7 +361,30 @@ Mientras se integran los backends reales ([sección 6](#6-backends)), el `docker
 
 <sub>👤 Responsable: Esteban Torres</sub>
 
-> ⏳ **Pendiente.** Cómo están construidos los backends, sus rutas (`/`, `/health`, `/metrics`, `/error`) y cómo forzar errores.
+Los backends se implementaron como una micro-aplicación en Python (Flask + Gunicorn) empaquetada en un contenedor Docker optimizado. Las tres instancias (`backend1`, `backend2`, `backend3`) ejecutan la misma imagen y se diferencian mediante la variable de entorno `INSTANCE_NAME`.
+
+### 6.1 Rutas de la API
+| Ruta | Método | Descripción | Código de respuesta |
+| :--- | :--- | :--- | :--- |
+| `/` | `GET` | Respuesta principal con el nombre de la instancia en JSON. | `200 OK` |
+| `/health` | `GET` | Check de salud para HAProxy y Docker. Excluido de métricas/logs. | `200 OK` |
+| `/metrics` | `GET` | Métricas HTTP en formato Prometheus. Excluido de métricas/logs. | `200 OK` |
+| `/error` | `GET` | Ruta de prueba para forzar errores HTTP 500. | `500 Internal Server Error` |
+
+### 6.2 Métricas expuestas (`/metrics`)
+- `http_requests_total{method, handler, status}`: Contador total de peticiones HTTP procesadas por método, ruta y código de estado.
+- `http_request_duration_seconds{method, handler}`: Histograma con la latencia de procesamiento de cada petición en segundos.
+
+### 6.3 Formato de Log JSON (`stdout`)
+Cada petición a rutas de aplicación genera un log estructurado de una sola línea en `stdout`:
+```json
+{"timestamp": 1793511346523, "level": "INFO", "message": "Peticion procesada GET / - 200", "instance": "backend1", "request_info": {"method": "GET", "path": "/", "status_code": 200, "duration_ms": 1.45, "client_ip": "172.18.0.4"}}
+```
+### 6.4 Construcción manual de la imagen
+```bash
+docker build -t backend:latest ./backends
+```
+---
 
 ## 7. Datadog Agent y cuenta
 
@@ -469,5 +496,60 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 - **Causa:** el puerto solo se publica en `127.0.0.1` a propósito.
 - **Solución:** abrirlo desde el equipo donde corre Docker.
 - <sub>Agregado por: Manuel</sub>
+
+</details>
+
+<details>
+<summary>Backends en estado (unhealthy) o HAProxy muestra servidores en DOWN</summary>
+
+- **Causa:** la aplicación Python falló al iniciar dentro del contenedor, la respuesta de `/health` superó el tiempo límite del healthcheck (`timeout`), o el servidor Gunicorn no quedó escuchando en el puerto interno 5000.
+- **Solución:**
+  1. Verificar los registros del backend para identificar fallos de sintaxis o de inicio en Python:
+     ```bash
+     docker compose logs backend1
+     ```
+  2. Ejecutar la verificación manual del endpoint de salud mediante Python nativo dentro del contenedor:
+     ```bash
+     docker exec backend1 python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/health').getcode())"
+     ```
+  3. Si la respuesta es `200`, confirmar que los contenedores compartan la red `cluster-net` y reconstruir las imágenes con:
+     ```bash
+     docker compose up -d --build
+     ```
+- <sub>Agregado por: Esteban</sub>
+
+</details>
+
+</details>
+
+<details>
+<summary>Comando <code>curl</code> no encontrado dentro del contenedor al verificar métricas</summary>
+
+- **Causa:** se intentó ejecutar `docker exec backend1 curl ...` dentro de la instancia, pero la imagen base `python:3.14-slim` no incluye herramientas de red adicionales para mantener el contenedor liviano y seguro.
+- **Solución:**
+  1. Utilizar el módulo nativo de Python `urllib.request` para consultar los endpoints internamente desde la terminal:
+     ```bash
+     docker exec backend1 python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/metrics').read().decode('utf-8'))"
+     ```
+  2. Alternativamente, realizar las consultas desde el equipo anfitrión ingresando desde el navegador a `http://localhost:8080/metrics`.
+- <sub>Agregado por: Esteban</sub>
+
+</details>
+
+<details>
+<summary>Logs del backend salen en texto plano en lugar de JSON estructurado</summary>
+
+- **Causa:** el archivo `backends/gunicorn.conf.py` tenía configurado `accesslog = '-'`, provocando que Gunicorn emitiera registros de acceso predeterminados en formato de texto plano (estilo Nginx/Apache) por `stdout`, ocultando los logs JSON estructurados generados por Flask en `app.py` e incluyendo peticiones operativas como `/health`.
+- **Solución:**
+  1. Editar `backends/gunicorn.conf.py` y cambiar la opción a `accesslog = None` para que solo la aplicación gestione la salida estándar.
+  2. Reconstruir y desplegar los contenedores:
+     ```bash
+     docker compose up -d --build
+     ```
+  3. Generar tráfico y verificar que la salida contenga únicamente el objeto JSON esperado:
+     ```bash
+     docker logs backend1 --tail 5
+     ```
+- <sub>Agregado por: Esteban</sub>
 
 </details>
