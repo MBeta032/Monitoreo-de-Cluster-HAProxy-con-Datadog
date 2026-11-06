@@ -28,32 +28,32 @@ services:
   # TEMPORALES: imagen traefik/whoami, solo para probar HAProxy mientras llegan los reales.
   # Esteban cambia "image" por sus backends. No cambiar nombres, hostname ni el puerto 5000.
   backend1:
-    image: traefik/whoami
+    build: ./backends
     container_name: backend1
     hostname: backend1
     environment:
-      WHOAMI_PORT_NUMBER: 5000
-      WHOAMI_NAME: backend1
+      INSTANCE_NAME: backend1
+      PORT: 5000
     networks:
       - cluster-net
 
   backend2:
-    image: traefik/whoami
+    build: ./backends
     container_name: backend2
     hostname: backend2
     environment:
-      WHOAMI_PORT_NUMBER: 5000
-      WHOAMI_NAME: backend2
+      INSTANCE_NAME: backend2
+      PORT: 5000
     networks:
       - cluster-net
 
   backend3:
-    image: traefik/whoami
+    build: ./backends
     container_name: backend3
     hostname: backend3
     environment:
-      WHOAMI_PORT_NUMBER: 5000
-      WHOAMI_NAME: backend3
+      INSTANCE_NAME: backend3
+      PORT: 5000
     networks:
       - cluster-net
 
