@@ -1,0 +1,26 @@
+init_config: {}
+
+instances:
+  - openmetrics_endpoint: http://backend1:5000/metrics
+    namespace: backend
+    metrics:
+      - http_requests
+      - http_request_duration_seconds
+    tags:
+      - backend:backend1
+
+  - openmetrics_endpoint: http://backend2:5000/metrics
+    namespace: backend
+    metrics:
+      - http_requests
+      - http_request_duration_seconds
+    tags:
+      - backend:backend2
+
+  - openmetrics_endpoint: http://backend3:5000/metrics
+    namespace: backend
+    metrics:
+      - http_requests
+      - http_request_duration_seconds
+    tags:
+      - backend:backend3

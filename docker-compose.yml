@@ -21,6 +21,8 @@ services:
       - backend1
       - backend2
       - backend3
+    labels:
+      com.datadoghq.ad.logs: '[{"source":"haproxy","service":"haproxy"}]'
     networks:
       - cluster-net 
   
@@ -34,6 +36,8 @@ services:
     environment:
       INSTANCE_NAME: backend1
       PORT: 5000
+    labels:
+      com.datadoghq.ad.logs: '[{"source":"python","service":"backend1"}]'
     networks:
       - cluster-net
 
@@ -44,6 +48,8 @@ services:
     environment:
       INSTANCE_NAME: backend2
       PORT: 5000
+    labels:
+      com.datadoghq.ad.logs: '[{"source":"python","service":"backend2"}]'
     networks:
       - cluster-net
 
@@ -54,10 +60,32 @@ services:
     environment:
       INSTANCE_NAME: backend3
       PORT: 5000
+    labels:
+      com.datadoghq.ad.logs: '[{"source":"python","service":"backend3"}]'
     networks:
       - cluster-net
 
   # --- datadog-agent (Jhon) ---
+  datadog-agent:
+    image: registry.datadoghq.com/agent:7.85.1
+    container_name: datadog-agent
+    environment:
+      DD_API_KEY: ${DD_API_KEY}
+      DD_SITE: ${DD_SITE}
+      DD_HOSTNAME: haproxy-telematicos-lab
+      DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "false"
+    group_add:
+      - "99"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - haproxy-socket:/var/lib/haproxy:ro
+      - ./datadog/datadog.yaml:/etc/datadog-agent/datadog.yaml:ro
+      - ./datadog/conf.d/haproxy.d/conf.yaml:/etc/datadog-agent/conf.d/haproxy.d/conf.yaml:ro
+      - ./datadog/conf.d/openmetrics.d/conf.yaml:/etc/datadog-agent/conf.d/openmetrics.d/conf.yaml:ro
+    networks:
+      - cluster-net
 
   # --- artillery (Juan José) ---
 
