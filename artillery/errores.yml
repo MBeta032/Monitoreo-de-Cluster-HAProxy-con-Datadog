@@ -1,0 +1,20 @@
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - name: "Tráfico con errores controlados"
+      # Duración provisional hasta conocer la ventana del monitor.
+      duration: 420
+      arrivalRate: 5
+
+scenarios:
+  - name: "Petición correcta"
+    weight: 9
+    flow:
+      - get:
+          url: "/"
+
+  - name: "Error intencional"
+    weight: 1
+    flow:
+      - get:
+          url: "/error"
