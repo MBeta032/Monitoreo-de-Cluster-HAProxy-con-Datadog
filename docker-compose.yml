@@ -69,6 +69,9 @@ services:
   datadog-agent:
     image: registry.datadoghq.com/agent:7.85.1
     container_name: datadog-agent
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       DD_API_KEY: ${DD_API_KEY}
       DD_SITE: ${DD_SITE}
