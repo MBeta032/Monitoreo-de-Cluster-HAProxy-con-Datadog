@@ -1,0 +1,23 @@
+{
+  "name": "[HAProxy] Caída de servidor backend detectada",
+  "type": "service check",
+  "query": "\"haproxy.backend_up\".over(\"project:haproxy-telematicos\").by(\"server\",\"backend\").last(1).count_by_status()",
+  "message": "{{#is_alert}}\n[CRÍTICO] El servidor {{server.name}} del backend {{backend.name}} no responde a las comprobaciones de salud (estado CRITICAL).\nHAProxy lo ha retirado de la rotación para proteger la disponibilidad del clúster be_app.\n\nAcción: Inspeccionar el contenedor afectado con `docker compose logs {{server.name}}`.\n{{/is_alert}}\n{{#is_recovery}}\n[RECUPERADO] El servidor {{server.name}} del backend {{backend.name}} ha vuelto a responder correctamente (estado OK). HAProxy ha reanudado el enrutamiento de tráfico hacia este nodo.\n{{/is_recovery}}",
+  "tags": [
+    "env:lab",
+    "project:haproxy-telematicos",
+    "service:haproxy"
+  ],
+  "options": {
+    "thresholds": {
+      "critical": 1,
+      "warning": 1,
+      "ok": 1
+    },
+    "notify_no_data": false,
+    "no_data_timeframe": 2,
+    "renotify_interval": 0,
+    "include_tags": true
+  },
+  "priority": 1
+}

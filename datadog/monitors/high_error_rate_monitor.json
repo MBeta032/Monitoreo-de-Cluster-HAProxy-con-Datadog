@@ -1,0 +1,22 @@
+{
+  "name": "[HAProxy] Tasa elevada de errores HTTP 5xx (> 5%)",
+  "type": "metric alert",
+  "query": "avg(last_5m):( sum:haproxy.backend.response.5xx{project:haproxy-telematicos}.as_rate() / sum:haproxy.frontend.requests.rate{project:haproxy-telematicos} ) * 100 > 5",
+  "message": "{{#is_alert}}\n[ALERTA CRÍTICA] La tasa de errores HTTP 5xx en el clúster ha superado el 5% en los últimos 5 minutos (valor actual: {{value}}%).\n\nPosibles causas:\n- Sobrecarga de tráfico durante pruebas de estrés.\n- Excepciones no controladas o fallos internos en los contenedores backend.\n- Agotamiento de conexiones concurrentes en los servidores.\n\nAcción recomendada: Revisar Datadog Log Explorer filtrando por `@status_code:[500 TO 599]` para identificar trazas de error.\n{{/is_alert}}\n{{#is_warning}}\n[ADVERTENCIA PREVENTIVA] La tasa de errores HTTP 5xx ha superado el 2% en los últimos 5 minutos (valor actual: {{value}}%). Monitorear comportamiento del clúster.\n{{/is_warning}}\n{{#is_recovery}}\n[RECUPERADO] La tasa de errores HTTP 5xx ha retornado a niveles normales (< 2%).\n{{/is_recovery}}",
+  "tags": [
+    "env:lab",
+    "project:haproxy-telematicos",
+    "service:haproxy"
+  ],
+  "options": {
+    "thresholds": {
+      "critical": 5.0,
+      "warning": 2.0
+    },
+    "evaluation_delay": 60,
+    "notify_no_data": false,
+    "renotify_interval": 0,
+    "include_tags": true
+  },
+  "priority": 2
+}
