@@ -1,0 +1,6 @@
+# Configuración general del Datadog Agent
+logs_enabled: true
+
+tags:
+  - "env:lab"
+  - "project:haproxy-telematicos"

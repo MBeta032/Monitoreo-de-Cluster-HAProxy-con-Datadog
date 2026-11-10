@@ -1,0 +1,9 @@
+init_config: {}
+
+instances:
+  - url: unix:///var/lib/haproxy/admin.sock
+    use_openmetrics: false
+    use_prometheus: false
+    enable_service_check: true
+    collect_status_metrics: true
+    disable_legacy_service_tag: true

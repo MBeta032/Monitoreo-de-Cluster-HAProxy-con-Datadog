@@ -50,8 +50,8 @@
 | Parte | Responsable | Estado |
 |---|---|:---:|
 | Infraestructura y HAProxy | Manuel | ✅ Listo |
-| Backends | Esteban |  🚧 En curso  |
-| Datadog Agent | Jhon | ⏳ Pendiente |
+| Backends | Esteban |  ✅ Listo  |
+| Datadog Agent | Jhon | ✅ Listo |
 | Dashboard y monitores | Alan | ⏳ Pendiente |
 | Pruebas de carga | Juan José | ⏳ Pendiente |
 | Integración, E2E y documentación | Sharon | ⏳ Pendiente |
@@ -127,6 +127,7 @@ flowchart LR
 
 ```
 .
+```text
 ├── docker-compose.yml       # Orquestación de todos los servicios (un bloque por dueño)
 ├── .env.example             # Plantilla de variables (copiar como .env)
 ├── .gitignore               # Archivos que Git no sube (incluye .env)
@@ -140,7 +141,12 @@ flowchart LR
 │   ├── requirements.txt    # Dependencias fijas del backend (Flask, prometheus-client, gunicorn)
 │   └── Dockerfile          # Imagen Python 3.14-slim, usuario no root y healthcheck nativo
 ├── datadog/
-│   ├── conf.d/haproxy.d/    # Integración HAProxy del Agent (conf.yaml)
+│   ├── datadog.yaml         # Configuración general del Agent, logs y etiquetas
+│   ├── conf.d/
+│   │   ├── haproxy.d/
+│   │   │   └── conf.yaml    # Métricas y service checks de HAProxy por socket Unix
+│   │   └── openmetrics.d/
+│   │       └── conf.yaml    # Métricas HTTP de los tres backends
 │   ├── dashboards/          # Dashboard exportado en JSON
 │   └── monitors/            # Monitores exportados en JSON
 ├── artillery/               # Escenarios de carga
@@ -159,6 +165,7 @@ flowchart LR
 | `docker-compose.yml` (integración) · `docs/diagramas/` | Sharon Abella (cada bloque de servicio lo edita su dueño) |
 
 ---
+
 
 ## 4. Despliegue rápido
 
@@ -390,7 +397,62 @@ docker build -t backend:latest ./backends
 
 <sub>👤 Responsable: Jhon Galvis</sub>
 
-> ⏳ **Pendiente.** Cómo obtener la API key, valor de `DD_SITE`, fecha de vencimiento de la cuenta de prueba y configuración del Agent.
+### 7.1 Cuenta y variables de entorno
+Para realizar el monitoreo se creó una cuenta de Datadog en la región US1 (`datadoghq.com`). La cuenta se encuentra en período de prueba gratuito y su fecha exacta de vencimiento es el martes 17 de Noviembre.
+
+La API key se obtiene desde **Organization Settings → API Keys**. Esta clave permite que el Agent envíe la información a Datadog.
+Para configurar las credenciales, se copia `.env.example` como `.env` y se completan las siguientes variables:
+
+- `DD_API_KEY`: clave de API de la organización.
+- `DD_SITE`: `datadoghq.com`.
+El archivo `.env` está excluido mediante `.gitignore` para evitar publicar credenciales en GitHub.
+
+### 7.2 Configuración de Datadog Agent
+Se integró Datadog Agent 7.85.1 como un servicio adicional de Docker Compose, identificado como `datadog-agent`, dentro de la red `cluster-net`.
+La configuración general se encuentra en `datadog/datadog.yaml`. Allí se habilita la recolección de logs y se establecen las etiquetas `env:lab` y `project:haproxy-telematicos`.
+El Agent utiliza el socket Docker para detectar contenedores y eventos. También comparte el volumen `haproxy-socket`, con acceso mediante el grupo 99, para consultar las estadísticas de HAProxy.
+
+### 7.3 Integración con HAProxy
+La configuración se encuentra en `datadog/conf.d/haproxy.d/conf.yaml`.
+Se utiliza el socket Unix `/var/lib/haproxy/admin.sock` mediante la integración heredada de HAProxy, con `use_openmetrics` y `use_prometheus` desactivados.
+Se habilitaron las opciones `enable_service_check` y `collect_status_metrics` para recopilar estadísticas de disponibilidad. También se configuró `disable_legacy_service_tag` para utilizar la etiqueta actual `haproxy_service`.
+La integración se verificó mediante `agent status` y `agent check haproxy`. Se obtuvieron 94 muestras de métricas y cuatro service checks por ejecución, incluidos los estados individuales de los tres backends.
+
+### 7.4 Métricas de los backends con OpenMetrics
+Las métricas HTTP se recolectan desde los endpoints `/metrics` de `backend1`, `backend2` y `backend3`, por el puerto interno 5000.
+La configuración se encuentra en `datadog/conf.d/openmetrics.d/conf.yaml`, donde se definieron tres instancias utilizando el namespace `backend`.
+Se confirmó la recepción de las siguientes métricas:
+- `backend.http_requests.count`
+- `backend.http_request_duration_seconds.sum`
+- `backend.http_request_duration_seconds.count`
+- `backend.http_request_duration_seconds.bucket`
+
+Las métricas incluyen la etiqueta `backend`, que permite distinguir cada servidor.
+
+Se intentó inicialmente utilizar Autodiscovery mediante etiquetas Docker para OpenMetrics, pero no se cargó la integración. Por este motivo se utilizó un archivo de configuración montado en el Agent, comprobando su funcionamiento con las tres instancias en estado OK.
+
+### 7.5 Recolección de logs
+Se configuró la recolección selectiva de logs mediante etiquetas Docker `com.datadoghq.ad.logs` en HAProxy y los tres backends.
+Los registros se identifican con los servicios `haproxy`, `backend1`, `backend2` y `backend3`.
+Se comprobó en Log Explorer que los registros JSON de HAProxy se reciben con atributos separados, entre ellos `backend`, `server`, `status_code`, `response_ms` y `total_ms`.
+A partir del atributo numérico `@total_ms` se creó la medida **HAProxy Total Latency**, en milisegundos, para analizar la latencia de las peticiones y calcular percentiles.
+Los mensajes informativos de arranque que aparecen como Error pueden provenir de la salida estándar de error. Para distinguir errores HTTP reales se recomienda consultar el atributo `status_code`.
+
+### 7.6 Eventos y pruebas de disponibilidad
+Se confirmó la recepción de eventos Docker en Event Explorer.
+Para comprobar la detección de fallos se detuvo temporalmente `backend2` mediante `docker compose stop backend2`.
+La integración generó el service check `haproxy.backend_up` con estado `CRITICAL` (`status: 2`) y etiqueta `backend:backend2`. Al mismo tiempo, HAProxy continuó atendiendo las peticiones mediante `backend1` y `backend3`.
+Posteriormente se restauró el contenedor mediante `docker compose start backend2` y se confirmó que los tres servidores regresaron al estado OK (`status: 0`).
+La creación de dashboards y monitores de alertas corresponde al integrante responsable de esa parte.
+
+### 7.7 Comandos de verificación
+- `docker compose ps`: comprobar el estado de los contenedores.
+- `docker compose exec -T datadog-agent agent status`: verificar las integraciones y el envío de información.
+- `docker compose exec -T datadog-agent agent check haproxy`: consultar métricas y service checks de HAProxy.
+- `docker compose exec -T datadog-agent agent check openmetrics`: comprobar las tres instancias de OpenMetrics.
+
+Las métricas se consultan en **Metrics Explorer**, los registros en **Log Explorer** y los eventos de contenedores en **Event Management → All Events**.
+
 
 ## 8. Dashboard y monitores
 
@@ -553,3 +615,50 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 - <sub>Agregado por: Esteban</sub>
 
 </details>
+
+
+<details>
+<summary>OpenMetrics no aparece en Datadog Agent</summary>
+
+- **Causa:** durante las pruebas, el Agent reconocía los contenedores Docker, pero no cargaba la integración OpenMetrics mediante etiquetas de Autodiscovery.
+- **Solución:** se configuraron los tres backends directamente en `datadog/conf.d/openmetrics.d/conf.yaml` y se montó el archivo en el contenedor del Agent. Después se comprobó con `agent status` que las tres instancias estaban en estado OK.
+- <sub>Agregado por: Jhon</sub>
+
+</details>
+
+<details>
+<summary>HAProxy recopila métricas, pero no genera service checks</summary>
+
+- **Causa:** las opciones `enable_service_check` y `collect_status_metrics` estaban desactivadas por defecto.
+- **Solución:** se habilitaron ambas opciones en `datadog/conf.d/haproxy.d/conf.yaml`. Con esto se obtuvieron cuatro service checks `haproxy.backend_up` y las métricas de disponibilidad.
+- <sub>Agregado por: Jhon</sub>
+
+</details>
+
+<details>
+<summary>Datadog muestra "The log file tailer could not be made, falling back to socket"</summary>
+
+- **Causa:** el Agent no pudo acceder directamente al archivo de logs del contenedor y utilizó el socket Docker.
+- **Solución:** se verificó mediante `agent status` que los cuatro servicios tenían estado OK y enviaban registros. No fue necesario modificar la configuración.
+- <sub>Agregado por: Jhon</sub>
+
+</details>
+
+<details>
+<summary>Datadog clasifica mensajes INFO y NOTICE como Error</summary>
+
+- **Causa probable:** los mensajes de arranque de HAProxy y Gunicorn se escriben en `stderr`, que Datadog puede clasificar como Error.
+- **Solución:** se comprobó que eran mensajes informativos y no errores HTTP. Para consultar fallos reales se recomienda utilizar el atributo `status_code` de los logs JSON.
+- <sub>Agregado por: Jhon</sub>
+
+</details>
+
+<details>
+<summary>OpenMetrics muestra contadores incompletos o cero muestras</summary>
+
+- **Causa probable:** Gunicorn utiliza dos workers que mantienen sus contadores de Prometheus de forma independiente.
+- **Solución pendiente:** se propuso al responsable de los backends utilizar un worker con cuatro threads o configurar Prometheus en modo multiproceso. El Agent ya recopila métricas de los tres servidores, pero falta validar su exactitud después de este ajuste.
+- <sub>Agregado por: Jhon</sub>
+
+</details>
+
