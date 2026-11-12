@@ -133,12 +133,18 @@ flowchart LR
 ├── .gitignore               # Archivos que Git no sube (incluye .env)
 ├── .gitattributes           # Fuerza finales de línea LF
 ├── README.md
+├── .github/
+│   └── workflows/
+│       └── backends-ci.yml  # CI de los backends: pruebas y construcción de la imagen en cada PR
 ├── haproxy/
 │   └── haproxy.cfg          # Configuración de HAProxy (montada de solo lectura)
 ├── backends/                # Código y Dockerfile de los backends
 │   ├── app.py              # Aplicación Flask instrumentada con Prometheus y logs JSON
 │   ├── gunicorn.conf.py    # Configuración de servidor de producción WSGI
 │   ├── requirements.txt    # Dependencias fijas del backend (Flask, prometheus-client, gunicorn)
+│   ├── requirements-dev.txt # Dependencias solo para pruebas (pytest); no entran a la imagen
+│   ├── .dockerignore       # Archivos que no se copian a la imagen (pruebas y cachés)
+│   ├── tests/              # Pruebas automáticas con pytest
 │   └── Dockerfile          # Imagen Python 3.14-slim, usuario no root y healthcheck nativo
 ├── datadog/
 │   ├── datadog.yaml         # Configuración general del Agent, logs y etiquetas
@@ -368,29 +374,145 @@ Mientras se integran los backends reales ([sección 6](#6-backends)), el `docker
 
 <sub>👤 Responsable: Esteban Torres</sub>
 
-Los backends se implementaron como una micro-aplicación en Python (Flask + Gunicorn) empaquetada en un contenedor Docker optimizado. Las tres instancias (`backend1`, `backend2`, `backend3`) ejecutan la misma imagen y se diferencian mediante la variable de entorno `INSTANCE_NAME`.
+Los backends son una aplicación en Python (**Flask 3.1.0** servida por **Gunicorn 23.0.0**, con métricas de **prometheus-client 0.21.1**) sobre `python:3.14-slim`, con usuario no root y healthcheck propio. Los tres contenedores (`backend1`, `backend2`, `backend3`) usan **la misma imagen**, `haproxy-telematicos-backend:1.0.0`, y se diferencian por la variable `INSTANCE_NAME`.
 
-### 6.1 Rutas de la API
-| Ruta | Método | Descripción | Código de respuesta |
-| :--- | :--- | :--- | :--- |
-| `/` | `GET` | Respuesta principal con el nombre de la instancia en JSON. | `200 OK` |
-| `/health` | `GET` | Check de salud para HAProxy y Docker. Excluido de métricas/logs. | `200 OK` |
-| `/metrics` | `GET` | Métricas HTTP en formato Prometheus. Excluido de métricas/logs. | `200 OK` |
-| `/error` | `GET` | Ruta de prueba para forzar errores HTTP 500. | `500 Internal Server Error` |
+El puerto `5000` de los backends no se publica en el equipo: desde afuera se llega a ellos por HAProxy (`http://localhost:8080`), que reparte cada petición a uno de los tres.
 
-### 6.2 Métricas expuestas (`/metrics`)
-- `http_requests_total{method, handler, status}`: Contador total de peticiones HTTP procesadas por método, ruta y código de estado.
-- `http_request_duration_seconds{method, handler}`: Histograma con la latencia de procesamiento de cada petición en segundos.
+### 6.1 Rutas
 
-### 6.3 Formato de Log JSON (`stdout`)
-Cada petición a rutas de aplicación genera un log estructurado de una sola línea en `stdout`:
+| Ruta | Método | Qué hace | Respuesta |
+|---|:---:|---|:---:|
+| `/` | `GET` | JSON con el nombre de la instancia que respondió (`instance`) | `200` |
+| `/health` | `GET` | Chequeo de salud para HAProxy y Docker | `200` |
+| `/metrics` | `GET` | Métricas HTTP en formato Prometheus | `200` |
+| `/error` | `GET` | Error forzado para probar el monitoreo | `500` |
+
+`/health` y `/metrics` **no se cuentan** en las métricas ni dejan línea en el log, para que los chequeos no se mezclen con el tráfico real.
+
+### 6.2 Cómo forzar errores
+
+Desde PowerShell (en Linux o macOS se escribe `curl` en lugar de `curl.exe`):
+
+```powershell
+# Error 500: deja una línea de log con level ERROR
+curl.exe -i http://localhost:8080/error
+
+# Error 404 (ruta que no existe): deja una línea con level WARNING y se cuenta con handler="unmatched"
+curl.exe -i http://localhost:8080/no-existe
+```
+
+### 6.3 Métricas (`/metrics`)
+
+| Métrica | Tipo | Labels |
+|---|---|---|
+| `http_requests_total` | Contador | `method`, `handler`, `status` |
+| `http_request_duration_seconds` | Histograma (segundos) | `method`, `handler` |
+
+- **`handler`** guarda la **ruta de Flask que coincidió** (por ejemplo `/` o `/error`), no la URL escrita por el usuario. Así, cuando haya rutas con IDs, todas las peticiones a una misma ruta quedan en una sola serie. Si ninguna ruta coincide (404), el valor es `unmatched`.
+- El Datadog Agent las lee con OpenMetrics y namespace `backend` ([ver 7.4](#74-métricas-de-los-backends-con-openmetrics)).
+
+Ejemplo real de la salida:
+
+```text
+# HELP http_requests_total Total de peticiones HTTP atendidas
+# TYPE http_requests_total counter
+http_requests_total{handler="/",method="GET",status="200"} 2.0
+http_request_duration_seconds_bucket{handler="/",le="0.005",method="GET"} 2.0
+http_request_duration_seconds_sum{handler="/",method="GET"} 0.0002646446228027344
+http_request_duration_seconds_count{handler="/",method="GET"} 2.0
+```
+
+**Por qué se usa el modo multiproceso.** Gunicorn atiende con varios *workers*, que son procesos separados. En el modo normal, prometheus-client guarda los contadores en la memoria de cada worker, y `/metrics` devuelve solo los del worker que atendió esa consulta: el contador "sube y baja" entre consultas. En el [modo multiproceso](https://prometheus.github.io/client_python/multiprocess/) cada worker escribe sus valores en archivos y `/metrics` los suma todos:
+
+- La carpeta es `/tmp/prometheus_multiproc` (variable `PROMETHEUS_MULTIPROC_DIR`, definida en el `Dockerfile`).
+- `gunicorn.conf.py` la **vacía cada vez que arranca Gunicorn** (hook `on_starting`). Esto importa porque con `restart: unless-stopped` el contenedor se reinicia sin recrearse y quedarían los archivos anteriores.
+- Cuando un worker termina, el hook `child_exit` avisa a prometheus-client (`mark_process_dead`). Sus archivos se conservan, así que **el contador no baja** si un worker se reinicia.
+
+Para ver las métricas de **un** backend en particular (por `localhost:8080` cada consulta cae en un backend distinto):
+
+```powershell
+docker exec backend1 python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/metrics').read().decode())"
+```
+
+### 6.4 Logs en JSON
+
+Cada petición (menos `/health` y `/metrics`) deja **una línea JSON** en la salida estándar (`stdout`). El nivel depende del resultado: `5xx` → `ERROR`, `4xx` → `WARNING`, el resto → `INFO`.
+
+| Campo | Contenido |
+|---|---|
+| `timestamp` | Momento del log, en milisegundos |
+| `level` | `INFO`, `WARNING` o `ERROR` |
+| `message` | Resumen de la petición |
+| `instance` | Backend que respondió |
+| `method` · `path` · `status_code` | Método, ruta real pedida y código de respuesta |
+| `duration_ms` | Tiempo de atención en milisegundos |
+| `client_ip` | IP de quien hizo la petición (normalmente HAProxy) |
+
+Líneas reales copiadas de `docker compose logs`:
+
 ```json
-{"timestamp": 1793511346523, "level": "INFO", "message": "Peticion procesada GET / - 200", "instance": "backend1", "request_info": {"method": "GET", "path": "/", "status_code": 200, "duration_ms": 1.45, "client_ip": "172.18.0.4"}}
+{"timestamp": 1794458443426, "level": "INFO", "message": "Peticion procesada GET / - 200", "instance": "backend1", "method": "GET", "path": "/", "status_code": 200, "duration_ms": 0.14, "client_ip": "172.18.0.5"}
+{"timestamp": 1794458443484, "level": "ERROR", "message": "Peticion procesada GET /error - 500", "instance": "backend2", "method": "GET", "path": "/error", "status_code": 500, "duration_ms": 0.18, "client_ip": "172.18.0.5"}
 ```
-### 6.4 Construcción manual de la imagen
-```bash
-docker build -t backend:latest ./backends
+
+Los mensajes de **Gunicorn** también salen en JSON por `stdout`, con su nivel real (configurados con `logconfig_dict` en `gunicorn.conf.py`). Así, Datadog ya no marca como Error los mensajes de arranque, pero sí ve como `ERROR` o `CRITICAL` los problemas reales, por ejemplo un worker que se cae o un *worker timeout*. El *access log* de Gunicorn está apagado.
+
+```json
+{"timestamp": 1794457915539, "level": "INFO", "message": "Booting worker with pid: 7", "instance": "backend1"}
 ```
+
+### 6.5 Construir la imagen
+
+```powershell
+docker compose build backend1 backend2 backend3
+docker images haproxy-telematicos-backend
+```
+
+Compose muestra `Built` tres veces (una por servicio), pero queda **una sola imagen**: `haproxy-telematicos-backend:1.0.0`. Para reconstruir y aplicar cambios del código: `docker compose up -d --build`.
+
+### 6.6 Escenarios de workers
+
+El número de workers de Gunicorn de cada backend se cambia en el archivo `.env` (plantilla en `.env.example`). Si una variable no está definida, ese backend usa **2**. Cada worker atiende con 4 *threads* en todos los escenarios, así que lo único que cambia es la cantidad de workers.
+
+| Escenario | `BACKEND1_WORKERS` | `BACKEND2_WORKERS` | `BACKEND3_WORKERS` |
+|---|:---:|:---:|:---:|
+| Normal | 2 | 2 | 2 |
+| Pocos workers | 1 | 1 | 1 |
+| Muchos workers | 4 | 4 | 4 |
+| Desigual | 1 | 2 | 4 |
+
+1. Editar los tres valores en `.env`.
+2. Aplicar el cambio (Compose recrea solo los backends cuyo valor cambió):
+   ```powershell
+   docker compose up -d backend1 backend2 backend3
+   ```
+3. Comprobar cuántos workers arrancó cada backend. `docker top` muestra un proceso maestro más un proceso por worker:
+   ```powershell
+   docker top backend1
+   docker compose logs backend1 | Select-String "Booting worker"
+   ```
+
+### 6.7 Límites de CPU y memoria
+
+Cada backend tiene un límite de **1 CPU** y **384 MB** de memoria (`deploy.resources.limits` en `docker-compose.yml`; Compose v2 los aplica sin Swarm) y `restart: unless-stopped`. Medido en este equipo: unos **61 MB** por backend con 2 workers y unos **103 MB** con 4 workers bajo tráfico.
+
+```powershell
+docker stats --no-stream backend1 backend2 backend3
+```
+
+Si un backend se queda sin memoria, el sistema puede matar a uno de sus workers; en ese caso Gunicorn deja en el log una línea `ERROR` con `Worker (pid:...) was sent SIGKILL! Perhaps out of memory?`.
+
+### 6.8 Pruebas automáticas
+
+Las pruebas usan pytest y el cliente de pruebas de Flask, sin Docker. Verifican las rutas, el nivel `ERROR` del log de `/error` y las métricas (que `/` se cuente, que `/health` no y que una ruta inventada quede como `unmatched`). pytest está en `requirements-dev.txt` y **no entra a la imagen**.
+
+```powershell
+cd backends
+python -m pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest -v
+```
+
+Se usa `python -m pytest` (y no solo `pytest`) para que Python encuentre `app.py` desde la carpeta `backends`. Las mismas pruebas, más la construcción de la imagen, corren solas en GitHub Actions (`.github/workflows/backends-ci.yml`) en cada Pull Request hacia `develop` o `main` que cambie `backends/`.
 ---
 
 ## 7. Datadog Agent y cuenta
@@ -627,8 +749,6 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
      docker compose up -d --build
      ```
 - <sub>Agregado por: Esteban</sub>
-
-</details>
 
 </details>
 
