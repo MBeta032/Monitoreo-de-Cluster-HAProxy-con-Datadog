@@ -52,7 +52,7 @@
 | Infraestructura y HAProxy | Manuel | ✅ Listo |
 | Backends | Esteban |  ✅ Listo  |
 | Datadog Agent | Jhon | ✅ Listo |
-| Dashboard y monitores | Alan | ⏳ Pendiente |
+| Dashboard y monitores | Alan | ✅ Listo |
 | Pruebas de carga | Juan José | ⏳ Pendiente |
 | Integración, E2E y documentación | Sharon | ⏳ Pendiente |
 
@@ -458,7 +458,55 @@ Las métricas se consultan en **Metrics Explorer**, los registros en **Log Explo
 
 <sub>👤 Responsable: Alan Basante</sub>
 
-> ⏳ **Pendiente.** URL del dashboard, guía de alertas y cómo importar los JSON de `datadog/`.
+- **Acceso directo:** [Ver Dashboard en Datadog (Enlace público)](https://p.datadoghq.com/sb/95a7b1a2-d9f8-11f1-b57e-baea63f7b3d6-092a4c169f18801ad9dc43ee02fcb845)
+
+Se implementó la capa de observabilidad visual y alertas tempranas en Datadog para supervisar en tiempo real la salud, el rendimiento y la disponibilidad del clúster HAProxy. Todas las definiciones se gestionan bajo el principio de **Observabilidad como Código (OaC)** mediante archivos JSON versionados en el repositorio, permitiendo un despliegue reproducible.
+
+### 8.1 Indicadores del Dashboard
+El dashboard centraliza los 4 indicadores obligatorios del clúster en una vista organizada ([`datadog/dashboards/haproxy_cluster_dashboard.json`](file:///c:/Users/Alanp/Desktop/GIT-HUB/Monitoreo-de-Cluster-HAProxy-con-Datadog/datadog/dashboards/haproxy_cluster_dashboard.json)):
+
+1. **Peticiones por segundo (Throughput):**
+   - **Métrica:** `sum:haproxy.frontend.requests.rate{project:haproxy-telematicos}`
+   - **Tipo de widget:** Gráfico temporal (`timeseries`).
+   - **Propósito:** Medir el caudal de solicitudes por segundo procesadas por el frontend `fe_web`.
+2. **Latencia promedio de respuesta:**
+   - **Métrica:** `avg:haproxy.backend.response.time{project:haproxy-telematicos}`
+   - **Tipo de widget:** Gráfico temporal (`timeseries`).
+   - **Propósito:** Supervisar el tiempo de respuesta (en ms) que toma el clúster `be_app` para despachar cada petición.
+3. **Disponibilidad y salud de backends:**
+   - **Check:** `haproxy.backend_up` agrupado por `server` y `backend`.
+   - **Tipo de widget:** Estado de chequeo de servicio (`check_status`).
+   - **Propósito:** Visualizar en tiempo real el semáforo operativo individual de `backend1`, `backend2` y `backend3`.
+4. **Tasa de error HTTP (%):**
+   - **Cálculo:** Ratio porcentual de respuestas 5xx frente al tráfico total atendido:
+     $$\text{Error Rate (\%)} = \left( \frac{\sum \text{haproxy.backend.response.5xx}}{\sum \text{haproxy.frontend.requests.rate}} \right) \times 100$$
+   - **Tipo de widget:** Valor numérico (`query_value`) con formato condicional: verde ($< 2\%$), advertencia preventiva en amarillo ($2\% - 5\%$) y crítico en rojo ($> 5\%$).
+
+### 8.2 Monitores y Alertas
+Se configuraron dos reglas de supervisión continua para notificar anomalías operativas:
+
+| Monitor | Tipo | Condición de disparo | Archivo |
+|---|:---:|---|---|
+| **Caída de Backend** | `service check` | Se activa de forma inmediata si un servidor pasa a estado `CRITICAL` en 1 chequeo consecutivo. | [`datadog/monitors/backend_down_monitor.json`](file:///c:/Users/Alanp/Desktop/GIT-HUB/Monitoreo-de-Cluster-HAProxy-con-Datadog/datadog/monitors/backend_down_monitor.json) |
+| **Tasa de Error HTTP** | `metric alert` | Evalúa el porcentaje de errores 5xx en una ventana de 5 minutos: aviso si supera el 2%, alerta crítica si supera el 5%. | [`datadog/monitors/high_error_rate_monitor.json`](file:///c:/Users/Alanp/Desktop/GIT-HUB/Monitoreo-de-Cluster-HAProxy-con-Datadog/datadog/monitors/high_error_rate_monitor.json) |
+
+Ambos monitores incorporan notificaciones contextualizadas con variables dinámicas (`{{server.name}}`, `{{value}}%`) y mensajes diferenciados para alerta (`{{#is_alert}}`) y recuperación automática (`{{#is_recovery}}`).
+
+### 8.3 Justificación técnica y selección de alternativas (Rúbrica)
+Para satisfacer los criterios de diseño y evaluación del proyecto se sustentaron las siguientes decisiones de ingeniería:
+- **Detección de caídas (Service Check vs Alerta de métrica):** Se seleccionó un `service check` nativo de HAProxy en lugar de una métrica acumulada. El service check evalúa el sondeo en intervalos de 1 segundo, detectando la caída de un contenedor en tiempo real sin el retraso que genera el cálculo de una ventana móvil.
+- **Tasa de errores (Ventana ponderada vs Umbral instantáneo):** Se adoptó una ventana temporal de 5 minutos (`avg(last_5m)`) con doble umbral (Warning 2%, Critical 5%). Esto previene falsos positivos por fallas transitorias en momentos de poco tráfico y asegura alineación con estándares de confiabilidad (SLO).
+- **Aprovisionamiento declarativo:** Mantener las definiciones en archivos JSON permite validar la configuración localmente, versionar cambios en Git y desplegar dashboards y monitores mediante la API de Datadog sin depender de modificaciones manuales efímeras.
+
+### 8.4 Importación de configuraciones en Datadog
+Para replicar esta infraestructura en cualquier cuenta de Datadog:
+- **Dashboard:** En Datadog, acceder a **Dashboards → New Dashboard**, seleccionar el menú de opciones (tres puntos) en la esquina superior derecha, elegir **Import JSON** y cargar `datadog/dashboards/haproxy_cluster_dashboard.json`.
+- **Monitores:** En **Monitors → New Monitor**, crear un monitor del tipo correspondiente, seleccionar **Edit as JSON** en la parte superior del formulario y pegar el contenido de los archivos en `datadog/monitors/`.
+
+### 8.5 Evidencias requeridas para el informe
+Para el informe IEEE y la sustentación se acotan estrictamente **dos capturas clave**:
+1. **Captura 1 (Dashboard general en régimen):** Vista completa del panel con tráfico activo de Artillery donde se evidencie el funcionamiento coordinado de los 4 widgets en condiciones normales.
+2. **Captura 2 (Alerta activa ante fallo):** Vista del monitor en Datadog en estado `CRITICAL` tras simular la detención de un backend (`docker compose stop backend2`).
 
 ## 9. Pruebas de carga
 

@@ -1,0 +1,99 @@
+{
+  "title": "Cluster HAProxy - Monitoreo y Rendimiento",
+  "description": "Dashboard de observabilidad para el cluster HAProxy con 3 backends HTTP. Muestra throughput, latencia promedio, disponibilidad de nodos y tasa de error HTTP.",
+  "layout_type": "free",
+  "widgets": [
+    {
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 55,
+        "height": 30
+      },
+      "definition": {
+        "title": "Peticiones por segundo (Throughput)",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "sum:haproxy.frontend.requests.rate{*}",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "layout": {
+        "x": 58,
+        "y": 0,
+        "width": 55,
+        "height": 30
+      },
+      "definition": {
+        "title": "Latencia promedio de respuesta (ms)",
+        "type": "timeseries",
+        "requests": [
+          {
+            "q": "avg:haproxy.backend.response.time{*}",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "layout": {
+        "x": 0,
+        "y": 32,
+        "width": 55,
+        "height": 30
+      },
+      "definition": {
+        "title": "Disponibilidad y salud de backends",
+        "type": "check_status",
+        "check": "haproxy.backend_up",
+        "grouping": "check",
+        "group_by": [
+          "backend"
+        ],
+        "tags": [
+          "*"
+        ]
+      }
+    },
+    {
+      "layout": {
+        "x": 58,
+        "y": 32,
+        "width": 55,
+        "height": 30
+      },
+      "definition": {
+        "title": "Tasa de error HTTP (%)",
+        "type": "query_value",
+        "requests": [
+          {
+            "q": "sum:haproxy.backend.response.5xx{*}.as_rate() / sum:haproxy.frontend.requests.rate{*} * 100",
+            "conditional_formats": [
+              {
+                "comparator": "<",
+                "value": 2,
+                "palette": "white_on_green"
+              },
+              {
+                "comparator": ">=",
+                "value": 2,
+                "palette": "white_on_yellow"
+              },
+              {
+                "comparator": ">=",
+                "value": 5,
+                "palette": "white_on_red"
+              }
+            ]
+          }
+        ],
+        "custom_unit": "%",
+        "precision": 2
+      }
+    }
+  ]
+}
