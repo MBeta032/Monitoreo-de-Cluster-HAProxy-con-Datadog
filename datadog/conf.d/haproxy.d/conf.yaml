@@ -7,3 +7,6 @@ instances:
     enable_service_check: true
     collect_status_metrics: true
     disable_legacy_service_tag: true
+    # El Agent lee la planilla de HAProxy cada 5 s (por defecto son 15 s).
+    # Así la caída de un backend se ve en Datadog en unos 5 a 10 s.
+    min_collection_interval: 5
