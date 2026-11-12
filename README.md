@@ -64,17 +64,17 @@
 
 <sub>👤 Responsable: Manuel Betancurt · Sharon Abella deja el diagrama final</sub>
 
-El proyecto monta un **clúster de tres servidores web** (backends) detrás de un **balanceador de carga HAProxy 2.6**. HAProxy recibe todas las peticiones de los usuarios y las reparte entre los tres backends; si uno se cae, lo detecta y deja de enviarle tráfico.
+El proyecto es la **Taquilla Sucursal**, una página para reservar sillas en teatros y escenarios de Cali, que corre en **tres backends** detrás del balanceador **HAProxy**. Todo se monitorea con **Datadog** y se prueba con carga generada por **Artillery**.
 
-El **Datadog Agent** recoge las métricas de HAProxy (por su socket de estadísticas), sus logs y los de los backends, y los envía a **Datadog**, donde se ven en un dashboard y se configuran alertas. **Artillery** genera tráfico de prueba (normal, pico y errores) para observar cómo reacciona el sistema.
-
-Todo corre en **contenedores Docker** orquestados con **Docker Compose**: no hay que instalar nada de esto en el equipo, solo Docker.
+- Todo corre en **contenedores Docker** (programas empaquetados con todo lo que necesitan) orquestados con **Docker Compose**: en el equipo solo hay que instalar Docker.
+- HAProxy (balanceador de carga: reparte las peticiones entre los backends) detecta si un backend se cae y deja de enviarle tráfico.
 
 | Componente | Qué hace | Imagen |
 |---|---|---|
-| `haproxy` | Balanceador de carga: recibe el tráfico en el puerto 8080 y lo reparte | `haproxy:2.6` (oficial) |
-| `backend1` · `backend2` · `backend3` | Servidores web que atienden las peticiones | Temporal: `traefik/whoami` ([ver 5.8](#58-backends-temporales)) |
-| `datadog-agent` | Recoge métricas y logs y los envía a Datadog | `datadog/agent:7` |
+| `haproxy` | Recibe todo el tráfico en el puerto 8080 y lo reparte entre los backends | `haproxy:2.6` (oficial) |
+| `backend1` · `backend2` · `backend3` | La Taquilla: páginas web y API, con Flask + Gunicorn (la aplicación en Python y el servidor que la atiende con varios procesos) | `haproxy-telematicos-backend:2.0.0` (propia, [sección 6](#6-backends)) |
+| `db` | Base de datos PostgreSQL con eventos, sillas, usuarios y reservas | `postgres:17.11` (oficial) |
+| `datadog-agent` | Recoge métricas y logs y los envía a Datadog | `registry.datadoghq.com/agent:7.85.1` |
 | `artillery` | Genera carga de prueba contra HAProxy | Por definir ([sección 9](#9-pruebas-de-carga)) |
 
 ```mermaid
@@ -86,6 +86,7 @@ flowchart LR
         B1["🖥️ backend1 :5000"]
         B2["🖥️ backend2 :5000"]
         B3["🖥️ backend3 :5000"]
+        DB[("🐘 db<br/>PostgreSQL 17.11")]
         D["🐶 datadog-agent"]
     end
     C["☁️ Datadog (nube)<br/>dashboard y monitores"]
@@ -95,17 +96,20 @@ flowchart LR
     H --> B1
     H --> B2
     H --> B3
+    B1 -->|"SQL :5432"| DB
+    B2 -->|"SQL :5432"| DB
+    B3 -->|"SQL :5432"| DB
     H -.->|"socket Unix<br/>volumen haproxy-socket"| D
     H -.->|"logs JSON por stdout"| D
     D -->|"HTTPS"| C
 ```
 
 **Recorrido de una petición:**
-1. El usuario (o Artillery) llama al puerto **8080**.
+1. El navegador (o Artillery) llama a `http://localhost:8080`.
 2. HAProxy escoge un backend **sano** y le pasa la petición.
-3. El backend responde y HAProxy le devuelve la respuesta al usuario.
-4. HAProxy escribe **una línea de log en JSON** con los datos de esa petición.
-5. El Datadog Agent lee ese log, consulta las métricas por el **socket** y envía todo a Datadog.
+3. El backend reconoce la sesión por su cookie (cualquiera de los tres puede) y consulta o reserva en PostgreSQL (`db`).
+4. El backend responde; HAProxy devuelve la respuesta y escribe **una línea de log en JSON**.
+5. El Datadog Agent lee los logs y las métricas y los envía a Datadog.
 
 ---
 
@@ -177,52 +181,37 @@ flowchart LR
 
 <sub>👤 Responsable: Sharon Abella · versión inicial: Manuel Betancurt</sub>
 
-Los comandos se escriben en una terminal: **PowerShell** en Windows, **Terminal** en macOS o Linux.
+Pasos para levantar todo el proyecto en un equipo con Docker. Los comandos son de PowerShell (en Linux o macOS: `cp` en lugar de `Copy-Item` y `curl` en lugar de `curl.exe`).
 
-**1. Descargar el proyecto y entrar a la carpeta**
-```bash
-git clone https://github.com/MBeta032/Monitoreo-de-Cluster-HAProxy-con-Datadog.git
-cd Monitoreo-de-Cluster-HAProxy-con-Datadog
-```
+1. Descargar el proyecto y entrar a la carpeta:
+   ```powershell
+   git clone https://github.com/MBeta032/Monitoreo-de-Cluster-HAProxy-con-Datadog.git
+   cd Monitoreo-de-Cluster-HAProxy-con-Datadog
+   ```
+2. Crear el archivo de variables `.env` y generar la clave de sesión:
+   ```powershell
+   Copy-Item .env.example .env
+   docker run --rm python:3.14-slim python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+   Debes ver: 64 letras y números. En `.env`, ponerlos en `SECRET_KEY` ([ver 6.3](#63-sesión-en-3-backends)), escribir una contraseña con solo letras y números en `POSTGRES_PASSWORD`, y llenar `DD_API_KEY` y `DD_SITE` solo si se va a usar Datadog ([sección 7](#7-datadog-agent-y-cuenta)).
+3. Construir y levantar todo: `docker compose up -d --build`
+4. Revisar el estado: `docker compose ps`
+   Debes ver: `db`, `backend1`, `backend2` y `backend3` en `(healthy)`.
+5. Abrir <http://localhost:8080> e iniciar sesión con `demo@taquilla.test` / `Taquilla2026!`.
+   Debes ver: la cartelera, tu nombre arriba y "Atendido por backendX" en el pie.
+6. Comprobar el balanceo con 6 llamadas seguidas:
+   ```powershell
+   curl.exe -s http://localhost:8080/api/info
+   curl.exe -s http://localhost:8080/api/info
+   curl.exe -s http://localhost:8080/api/info
+   curl.exe -s http://localhost:8080/api/info
+   curl.exe -s http://localhost:8080/api/info
+   curl.exe -s http://localhost:8080/api/info
+   ```
+   Debes ver: `backend1`, `backend2`, `backend3`, y otra vez en el mismo orden.
 
-**2. Crear el archivo de variables** a partir de la plantilla y llenarlo ([ver sección 7](#7-datadog-agent-y-cuenta)). Solo es necesario cuando el Datadog Agent esté incluido; HAProxy y los backends arrancan sin él.
-```bash
-cp .env.example .env              # en PowerShell: Copy-Item .env.example .env
-```
-
-**3. Levantar todos los servicios** en segundo plano
-```bash
-docker compose up -d
-```
-
-**4. Verificar** que todos los contenedores estén en estado `Up`
-```bash
-docker compose ps
-```
-
-Para apagar todo: `docker compose down`
-
-<details>
-<summary>Comprobar que HAProxy reparte la carga</summary>
-
-Hacer 6 peticiones seguidas:
-```bash
-# Windows (PowerShell): curl es un alias de otro comando, hay que escribir curl.exe
-1..6 | ForEach-Object { curl.exe -s http://localhost:8080/ | Select-String "^Name" }
-
-# Linux o macOS
-for i in $(seq 6); do curl -s http://localhost:8080/ | grep '^Name'; done
-```
-Con los backends temporales debe salir `Name: backend1`, `backend2`, `backend3`, y otra vez 1, 2, 3.
-
-Tablero de estadísticas: abrir <http://localhost:8404/stats> y comprobar que los 3 backends están en verde (`UP`).
-
-Último log, en JSON:
-```bash
-docker compose logs --no-log-prefix haproxy --tail 1
-```
-
-</details>
+- Después de recrear los backends, ejecutar `docker compose restart haproxy` (problema conocido que se arregla en la fase de HAProxy).
+- Volver a los datos iniciales (borra las reservas y las cuentas nuevas): `docker compose rm -s -f db`, luego `docker volume rm pg-data` y `docker compose up -d`. Para apagar todo: `docker compose down`.
 
 ---
 
@@ -374,105 +363,74 @@ Mientras se integran los backends reales ([sección 6](#6-backends)), el `docker
 
 <sub>👤 Responsable: Esteban Torres</sub>
 
-Los backends son una aplicación en Python (**Flask 3.1.0** servida por **Gunicorn 23.0.0**, con métricas de **prometheus-client 0.21.1**) sobre `python:3.14-slim`, con usuario no root y healthcheck propio. Los tres contenedores (`backend1`, `backend2`, `backend3`) usan **la misma imagen**, `haproxy-telematicos-backend:1.0.0`, y se diferencian por la variable `INSTANCE_NAME`.
+Los backends son la **Taquilla Sucursal**: una aplicación web en Python (Flask 3.1.0 con Gunicorn 23.0.0) donde se reservan sillas, sin pagos. Los tres contenedores usan la misma imagen, `haproxy-telematicos-backend:2.0.0`, y comparten la base de datos `db`.
 
-El puerto `5000` de los backends no se publica en el equipo: desde afuera se llega a ellos por HAProxy (`http://localhost:8080`), que reparte cada petición a uno de los tres.
+### 6.1 Qué hace
 
-### 6.1 Rutas
+- Flujo: Cartelera → Zona → Silla → Iniciar sesión → Confirmar → Listo → Mis reservas.
 
-| Ruta | Método | Qué hace | Respuesta |
-|---|:---:|---|:---:|
-| `/` | `GET` | JSON con el nombre de la instancia que respondió (`instance`) | `200` |
-| `/health` | `GET` | Chequeo de salud para HAProxy y Docker | `200` |
-| `/metrics` | `GET` | Métricas HTTP en formato Prometheus | `200` |
-| `/error` | `GET` | Error forzado para probar el monitoreo | `500` |
-
-`/health` y `/metrics` **no se cuentan** en las métricas ni dejan línea en el log, para que los chequeos no se mezclen con el tráfico real.
-
-### 6.2 Cómo forzar errores
-
-Desde PowerShell (en Linux o macOS se escribe `curl` en lugar de `curl.exe`):
-
-```powershell
-# Error 500: deja una línea de log con level ERROR
-curl.exe -i http://localhost:8080/error
-
-# Error 404 (ruta que no existe): deja una línea con level WARNING y se cuenta con handler="unmatched"
-curl.exe -i http://localhost:8080/no-existe
-```
-
-### 6.3 Métricas (`/metrics`)
-
-| Métrica | Tipo | Labels |
+| Evento del seed (datos iniciales, `db/init/02_seed.sql`) | Lugar | Sillas |
 |---|---|---|
-| `http_requests_total` | Contador | `method`, `handler`, `status` |
-| `http_request_duration_seconds` | Histograma (segundos) | `method`, `handler` |
+| Concierto Caña y Clave (venta flash) | Teatro al Aire Libre Los Cristales | 2.000 en 4 zonas: Platea, Gradería Central, Izquierda y Derecha |
+| Obra: El Cuentero del Pacífico | Teatro Municipal Enrique Buenaventura | 100 |
+| Noche de jazz | Teatro Jorge Isaacs | 100 |
+| Cuentos de medianoche | Teatrino del Teatro Municipal | 40, ya reservadas (sale AGOTADO) |
 
-- **`handler`** guarda la **ruta de Flask que coincidió** (por ejemplo `/` o `/error`), no la URL escrita por el usuario. Así, cuando haya rutas con IDs, todas las peticiones a una misma ruta quedan en una sola serie. Si ninguna ruta coincide (404), el valor es `unmatched`.
-- El Datadog Agent las lee con OpenMetrics y namespace `backend` ([ver 7.4](#74-métricas-de-los-backends-con-openmetrics)).
+- Usuarios **solo para pruebas**: `demo@taquilla.test` y `prueba001@taquilla.test` a `prueba200@taquilla.test`, todos con la contraseña `Taquilla2026!`.
 
-Ejemplo real de la salida:
+### 6.2 Rutas
 
-```text
-# HELP http_requests_total Total de peticiones HTTP atendidas
-# TYPE http_requests_total counter
-http_requests_total{handler="/",method="GET",status="200"} 2.0
-http_request_duration_seconds_bucket{handler="/",le="0.005",method="GET"} 2.0
-http_request_duration_seconds_sum{handler="/",method="GET"} 0.0002646446228027344
-http_request_duration_seconds_count{handler="/",method="GET"} 2.0
-```
+| Página (la arma Flask) | Método | Sesión | Qué hace |
+|---|:---:|:---:|---|
+| `/` | GET | No | Cartelera |
+| `/events/<id>` | GET | No | Plano de zonas; con `?section=<zona>`, las sillas de esa zona |
+| `/events/<id>/confirm?seat=<id>` | GET · POST | Sí (si no, va a `/login`) | Resumen · reserva (303 a la pantalla Listo, o 409 si alguien la tomó antes) |
+| `/reservations` · `/reservations/<id>` | GET | Sí | Mis reservas · pantalla Listo (404 si la reserva es de otro) |
+| `/login` · `/register` · `/logout` | GET y POST | — | Cuentas (los formularios llevan token CSRF) |
+| `/health` · `/metrics` · `/error` | GET | No | Salud (200), métricas y error forzado (500) |
 
-**Por qué se usa el modo multiproceso.** Gunicorn atiende con varios *workers*, que son procesos separados. En el modo normal, prometheus-client guarda los contadores en la memoria de cada worker, y `/metrics` devuelve solo los del worker que atendió esa consulta: el contador "sube y baja" entre consultas. En el [modo multiproceso](https://prometheus.github.io/client_python/multiprocess/) cada worker escribe sus valores en archivos y `/metrics` los suma todos:
+| API en JSON (contrato para Artillery; 503 si la base no responde) | Método | Sesión | `X-CSRF-Token` | Respuestas |
+|---|:---:|:---:|:---:|---|
+| `/api/info` | GET | No | No | 200 con `instance` |
+| `/api/events` · `/api/events/<id>` | GET | No | No | 200 · 404 |
+| `/api/events/<id>/seats` (opcional `?section=<zona>`) | GET | No | No | 200 · 404 |
+| `/api/login` (JSON con `email` y `password`) | POST | No | No | 200 con el usuario y el **`csrf_token`** · 400 · 401 |
+| `/api/events/<id>/seats/<seat_id>/reserve` | POST | Sí | Sí | 201 con el código (`TS-000045`) · 401 · 403 · 404 · 409 |
+| `/api/reservations` | GET | Sí | No | 200 · 401 |
+| `/api/logout` | POST | Sí | Sí | 200 · 403 |
 
-- La carpeta es `/tmp/prometheus_multiproc` (variable `PROMETHEUS_MULTIPROC_DIR`, definida en el `Dockerfile`).
-- `gunicorn.conf.py` la **vacía cada vez que arranca Gunicorn** (hook `on_starting`). Esto importa porque con `restart: unless-stopped` el contenedor se reinicia sin recrearse y quedarían los archivos anteriores.
-- Cuando un worker termina, el hook `child_exit` avisa a prometheus-client (`mark_process_dead`). Sus archivos se conservan, así que **el contador no baja** si un worker se reinicia.
-
-Para ver las métricas de **un** backend en particular (por `localhost:8080` cada consulta cae en un backend distinto):
-
-```powershell
-docker exec backend1 python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:5000/metrics').read().decode())"
-```
-
-### 6.4 Logs en JSON
-
-Cada petición (menos `/health` y `/metrics`) deja **una línea JSON** en la salida estándar (`stdout`). El nivel depende del resultado: `5xx` → `ERROR`, `4xx` → `WARNING`, el resto → `INFO`.
-
-| Campo | Contenido |
-|---|---|
-| `timestamp` | Momento del log, en milisegundos |
-| `level` | `INFO`, `WARNING` o `ERROR` |
-| `message` | Resumen de la petición |
-| `instance` | Backend que respondió |
-| `method` · `path` · `status_code` | Método, ruta real pedida y código de respuesta |
-| `duration_ms` | Tiempo de atención en milisegundos |
-| `client_ip` | IP de quien hizo la petición (normalmente HAProxy) |
-
-Líneas reales copiadas de `docker compose logs`:
-
-```json
-{"timestamp": 1794458443426, "level": "INFO", "message": "Peticion procesada GET / - 200", "instance": "backend1", "method": "GET", "path": "/", "status_code": 200, "duration_ms": 0.14, "client_ip": "172.18.0.5"}
-{"timestamp": 1794458443484, "level": "ERROR", "message": "Peticion procesada GET /error - 500", "instance": "backend2", "method": "GET", "path": "/error", "status_code": 500, "duration_ms": 0.18, "client_ip": "172.18.0.5"}
-```
-
-Los mensajes de **Gunicorn** también salen en JSON por `stdout`, con su nivel real (configurados con `logconfig_dict` en `gunicorn.conf.py`). Así, Datadog ya no marca como Error los mensajes de arranque, pero sí ve como `ERROR` o `CRITICAL` los problemas reales, por ejemplo un worker que se cae o un *worker timeout*. El *access log* de Gunicorn está apagado.
-
-```json
-{"timestamp": 1794457915539, "level": "INFO", "message": "Booting worker with pid: 7", "instance": "backend1"}
-```
-
-### 6.5 Construir la imagen
+- Para Artillery: `POST /api/login` una sola vez por usuario virtual (guarda la cookie y el `csrf_token`) y luego `POST .../reserve` con el encabezado `X-CSRF-Token`. Conviene golpear la API y no las páginas (una zona del concierto pesa unos 94 KB).
 
 ```powershell
-docker compose build backend1 backend2 backend3
-docker images haproxy-telematicos-backend
+Set-Content login.json '{"email":"prueba001@taquilla.test","password":"Taquilla2026!"}'
+$login = curl.exe -s -c cookies.txt -H "Content-Type: application/json" --data-binary "@login.json" http://localhost:8080/api/login | ConvertFrom-Json
+curl.exe -s -b cookies.txt -X POST -H "X-CSRF-Token: $($login.csrf_token)" http://localhost:8080/api/events/1/seats/12/reserve
 ```
+Debes ver: `{"code":"TS-...","section":"Platea",...}`. Si repites el último comando, la respuesta es 409 (silla ya reservada).
 
-Compose muestra `Built` tres veces (una por servicio), pero queda **una sola imagen**: `haproxy-telematicos-backend:1.0.0`. Para reconstruir y aplicar cambios del código: `docker compose up -d --build`.
+### 6.3 Sesión en 3 backends
+
+- La sesión es una **cookie firmada** (un dato que guarda el navegador y que el backend comprueba que nadie cambió). Solo lleva el id del usuario y el token CSRF, y no vive en la memoria de ningún backend.
+- Los 3 backends usan la **misma `SECRET_KEY`** (la clave que firma la cookie), así que cualquiera reconoce la sesión que creó otro. Demo: inicia sesión, recarga varias veces y mira que cambia "Atendido por backendX" sin perder la sesión.
+- Cada formulario y cada POST de la API llevan un **token CSRF** (un código de la sesión que una página de otro sitio no puede conocer); si falta o no coincide, la respuesta es 403. La cookie dura 2 horas, con HttpOnly y SameSite=Lax (en producción, con HTTPS, también Secure).
+
+### 6.4 Base de datos
+
+- Servicio `db` (PostgreSQL 17.11), solo dentro de `cluster-net`, con el volumen `pg-data` (guarda los datos aunque se borre el contenedor; para volver a los datos iniciales, ver la [sección 4](#4-despliegue-rápido)). El esquema y el seed (`db/init/`) se cargan la primera vez.
+- **Reserva atómica** (todo o nada): una sola consulta aparta la silla solo si sigue libre y crea la reserva en la misma transacción. Dos personas no pueden apartar la misma silla: probado con 30 a la vez, una recibe 201 y las demás 409.
+- Si la base no responde: la API da 503 en JSON, las páginas muestran "Servicio no disponible", y queda una línea de log `ERROR`.
+- Conexiones: cada worker abre una por hilo (4). Con 4 workers por backend: 4 × 4 × 3 = 48, por debajo del máximo de 100 de PostgreSQL.
+
+### 6.5 Métricas y logs
+
+- `http_requests_total` (contador; labels `method`, `handler`, `status`) y `http_request_duration_seconds` (histograma; labels `method`, `handler`), en `/metrics`.
+- `handler` es la ruta de Flask y no la URL escrita (por ejemplo `/api/events/<int:event_id>/seats/<int:seat_id>/reserve`); si ninguna coincide, vale `unmatched`. `/health` y `/metrics` no se cuentan.
+- Cada petición deja una línea JSON en el log: `5xx` → `ERROR`, `4xx` → `WARNING`, el resto `INFO`. Nunca se escriben contraseñas ni tokens.
+- Modo multiproceso (prometheus-client suma lo de todos los workers de Gunicorn): cada worker escribe en `/tmp/prometheus_multiproc`, y esa carpeta se vacía cada vez que arranca Gunicorn.
 
 ### 6.6 Escenarios de workers
 
-El número de workers de Gunicorn de cada backend se cambia en el archivo `.env` (plantilla en `.env.example`). Si una variable no está definida, ese backend usa **2**. Cada worker atiende con 4 *threads* en todos los escenarios, así que lo único que cambia es la cantidad de workers.
+El número de workers (procesos de Gunicorn) de cada backend se cambia en `.env`; si no se define, cada uno usa 2. Cada worker atiende con 4 hilos.
 
 | Escenario | `BACKEND1_WORKERS` | `BACKEND2_WORKERS` | `BACKEND3_WORKERS` |
 |---|:---:|:---:|:---:|
@@ -481,38 +439,36 @@ El número de workers de Gunicorn de cada backend se cambia en el archivo `.env`
 | Muchos workers | 4 | 4 | 4 |
 | Desigual | 1 | 2 | 4 |
 
-1. Editar los tres valores en `.env`.
-2. Aplicar el cambio (Compose recrea solo los backends cuyo valor cambió):
-   ```powershell
-   docker compose up -d backend1 backend2 backend3
-   ```
-3. Comprobar cuántos workers arrancó cada backend. `docker top` muestra un proceso maestro más un proceso por worker:
-   ```powershell
-   docker top backend1
-   docker compose logs backend1 | Select-String "Booting worker"
-   ```
-
-### 6.7 Límites de CPU y memoria
-
-Cada backend tiene un límite de **1 CPU** y **384 MB** de memoria (`deploy.resources.limits` en `docker-compose.yml`; Compose v2 los aplica sin Swarm) y `restart: unless-stopped`. Medido en este equipo: unos **61 MB** por backend con 2 workers y unos **103 MB** con 4 workers bajo tráfico.
-
 ```powershell
-docker stats --no-stream backend1 backend2 backend3
+docker compose up -d backend1 backend2 backend3
+docker compose restart haproxy
 ```
+Debes ver: `Recreated` en los backends cuyo valor cambió. Con `docker top backend1` se ve un proceso maestro más uno por worker.
 
-Si un backend se queda sin memoria, el sistema puede matar a uno de sus workers; en ese caso Gunicorn deja en el log una línea `ERROR` con `Worker (pid:...) was sent SIGKILL! Perhaps out of memory?`.
+### 6.7 Límites
 
-### 6.8 Pruebas automáticas
+- Cada backend tiene 1 CPU y 384 MB de memoria (medido: unos 85 MB con 2 workers).
+- Cada inicio de sesión gasta unos 300 ms de CPU (hash pbkdf2 con 600.000 iteraciones; no se usa scrypt porque pide 32 MB por login). Por eso, en Artillery cada usuario virtual inicia sesión una sola vez.
 
-Las pruebas usan pytest y el cliente de pruebas de Flask, sin Docker. Verifican las rutas, el nivel `ERROR` del log de `/error` y las métricas (que `/` se cuente, que `/health` no y que una ruta inventada quede como `unmatched`). pytest está en `requirements-dev.txt` y **no entra a la imagen**.
+### 6.8 Pruebas
 
 ```powershell
 cd backends
 python -m pip install -r requirements.txt -r requirements-dev.txt
 python -m pytest -v
 ```
+Debes ver: `34 passed, 37 skipped` (las pruebas que usan base de datos se saltan sin `TEST_DATABASE_URL`).
 
-Se usa `python -m pytest` (y no solo `pytest`) para que Python encuentre `app.py` desde la carpeta `backends`. Las mismas pruebas, más la construcción de la imagen, corren solas en GitHub Actions (`.github/workflows/backends-ci.yml`) en cada Pull Request hacia `develop` o `main` que cambie `backends/`.
+Con una base de prueba (PostgreSQL temporal en el puerto 5433; esperar unos segundos después del `docker run`):
+```powershell
+docker run -d --name boleteria-test-db -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=boleteria_test -p 127.0.0.1:5433:5432 postgres:17.11
+$env:TEST_DATABASE_URL = "postgresql://postgres@127.0.0.1:5433/boleteria_test"
+python -m pytest -v
+docker rm -f boleteria-test-db
+```
+Debes ver: `71 passed`. Se usa `127.0.0.1` y no `localhost`: en Windows, `localhost` intenta primero IPv6 y la conexión se queda colgada.
+
+- CI: GitHub Actions corre las 71 pruebas con un PostgreSQL 17.11 y construye la imagen en cada Pull Request que cambie `backends/` o `db/`.
 
 ---
 
