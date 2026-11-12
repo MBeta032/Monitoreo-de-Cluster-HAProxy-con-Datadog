@@ -4,7 +4,14 @@ import json
 import logging
 import sys
 from flask import Flask, jsonify, request, Response
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
 
 app = Flask(__name__)
 
@@ -105,7 +112,11 @@ def trigger_error():
 
 @app.route('/metrics')
 def metrics():
-    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+    # Modo multiproceso: suma las métricas de todos los workers de Gunicorn,
+    # leyendo los archivos de PROMETHEUS_MULTIPROC_DIR (documentación de prometheus-client)
+    registry = CollectorRegistry()
+    multiprocess.MultiProcessCollector(registry)
+    return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
 
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 5000))

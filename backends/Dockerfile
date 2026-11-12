@@ -18,6 +18,10 @@ RUN chown -R appuser:appgroup /app
 
 USER appuser
 
+# Carpeta donde prometheus-client guarda las métricas de cada worker (modo multiproceso).
+# gunicorn.conf.py la crea y la vacía al arrancar.
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+
 EXPOSE 5000
 
 # Healthcheck nativo sin instalar curl en la imagen
