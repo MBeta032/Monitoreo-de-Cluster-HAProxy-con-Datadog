@@ -51,6 +51,9 @@ services:
         condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend1"}]'
+      # Métricas de /metrics por Autodiscovery (antes: datadog/conf.d/openmetrics.d/conf.yaml).
+      # El JSON va entre comillas simples para que YAML lo deje como texto.
+      com.datadoghq.ad.checks: '{"openmetrics": {"instances": [{"openmetrics_endpoint": "http://backend1:5000/metrics", "namespace": "backend", "metrics": ["http_requests", "http_request_duration_seconds"], "tags": ["backend:backend1"]}]}}'
     networks:
       - cluster-net
     deploy:
@@ -81,6 +84,7 @@ services:
         condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend2"}]'
+      com.datadoghq.ad.checks: '{"openmetrics": {"instances": [{"openmetrics_endpoint": "http://backend2:5000/metrics", "namespace": "backend", "metrics": ["http_requests", "http_request_duration_seconds"], "tags": ["backend:backend2"]}]}}'
     networks:
       - cluster-net
     deploy:
@@ -111,6 +115,7 @@ services:
         condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend3"}]'
+      com.datadoghq.ad.checks: '{"openmetrics": {"instances": [{"openmetrics_endpoint": "http://backend3:5000/metrics", "namespace": "backend", "metrics": ["http_requests", "http_request_duration_seconds"], "tags": ["backend:backend3"]}]}}'
     networks:
       - cluster-net
     deploy:
@@ -131,6 +136,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-boleteria}
       POSTGRES_USER: ${POSTGRES_USER:-boleteria}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+      # Contraseña del usuario de solo lectura "datadog" (la usa db/init/03_datadog_user.sh)
+      DD_POSTGRES_PASSWORD: ${DD_POSTGRES_PASSWORD:?Define DD_POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+    # Deja en el log de PostgreSQL toda consulta que tarde más de 250 ms
+    command: ["postgres", "-c", "log_min_duration_statement=250"]
+    labels:
+      # Check de PostgreSQL por Autodiscovery. %%env_DD_POSTGRES_PASSWORD%% lo reemplaza el Agent
+      # con su propia variable de entorno: la contraseña no queda escrita en el repo.
+      # "relations" activa las métricas por tabla y la de bloqueos (postgresql.locks) de las dos
+      # tablas que más se usan en la venta flash.
+      com.datadoghq.ad.checks: '{"postgres": {"instances": [{"host": "db", "port": 5432, "username": "datadog", "password": "%%env_DD_POSTGRES_PASSWORD%%", "dbname": "${POSTGRES_DB:-boleteria}", "relations": [{"relation_name": "seats"}, {"relation_name": "reservations"}], "tags": ["project:haproxy-telematicos", "env:lab"]}]}}'
+      com.datadoghq.ad.logs: '[{"source":"postgresql","service":"db"}]'
     volumes:
       - pg-data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
@@ -149,6 +165,8 @@ services:
   # --- datadog-agent (Jhon) ---
   datadog-agent:
     image: registry.datadoghq.com/agent:7.85.1
+    # Se vuelve a levantar solo si se cae o si Docker se reinicia (igual que los backends)
+    restart: unless-stopped
     container_name: datadog-agent
     dns:
       - 8.8.8.8
@@ -158,6 +176,8 @@ services:
       DD_SITE: ${DD_SITE}
       DD_HOSTNAME: haproxy-telematicos-lab
       DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "false"
+      # La lee el check de postgres (etiqueta del servicio db) con %%env_DD_POSTGRES_PASSWORD%%
+      DD_POSTGRES_PASSWORD: ${DD_POSTGRES_PASSWORD:?Define DD_POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
     group_add:
       - "99"
     volumes:
@@ -167,7 +187,7 @@ services:
       - haproxy-socket:/var/lib/haproxy:ro
       - ./datadog/datadog.yaml:/etc/datadog-agent/datadog.yaml:ro
       - ./datadog/conf.d/haproxy.d/conf.yaml:/etc/datadog-agent/conf.d/haproxy.d/conf.yaml:ro
-      - ./datadog/conf.d/openmetrics.d/conf.yaml:/etc/datadog-agent/conf.d/openmetrics.d/conf.yaml:ro
+      - ./datadog/conf.d/http_check.d/conf.yaml:/etc/datadog-agent/conf.d/http_check.d/conf.yaml:ro
     networks:
       - cluster-net
 

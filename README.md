@@ -154,11 +154,16 @@ flowchart LR
 │   ├── datadog.yaml         # Configuración general del Agent, logs y etiquetas
 │   ├── conf.d/
 │   │   ├── haproxy.d/
-│   │   │   └── conf.yaml    # Métricas y service checks de HAProxy por socket Unix
-│   │   └── openmetrics.d/
-│   │       └── conf.yaml    # Métricas HTTP de los tres backends
+│   │   │   └── conf.yaml    # Métricas y service checks de HAProxy por socket Unix (cada 5 s)
+│   │   └── http_check.d/
+│   │       └── conf.yaml    # Cliente misterioso: pide /api/events por HAProxy cada 15 s
 │   ├── dashboards/          # Dashboard exportado en JSON
 │   └── monitors/            # Monitores exportados en JSON
+├── db/
+│   └── init/                # Se ejecutan una sola vez, al crear el volumen pg-data
+│       ├── 01_schema.sql    # Tablas: users, events, seats y reservations
+│       ├── 02_seed.sql      # Eventos, sillas y usuarios de prueba
+│       └── 03_datadog_user.sh # Usuario datadog de solo lectura para el Agent
 ├── artillery/               # Escenarios de carga
 └── docs/
     ├── diagramas/           # Diagramas de arquitectura
@@ -193,7 +198,7 @@ Pasos para levantar todo el proyecto en un equipo con Docker. Los comandos son d
    Copy-Item .env.example .env
    docker run --rm python:3.14-slim python -c "import secrets; print(secrets.token_hex(32))"
    ```
-   Debes ver: 64 letras y números. En `.env`, ponerlos en `SECRET_KEY` ([ver 6.3](#63-sesión-en-3-backends)), escribir una contraseña con solo letras y números en `POSTGRES_PASSWORD`, y llenar `DD_API_KEY` y `DD_SITE` solo si se va a usar Datadog ([sección 7](#7-datadog-agent-y-cuenta)).
+   Debes ver: 64 letras y números. En `.env`, ponerlos en `SECRET_KEY` ([ver 6.3](#63-sesión-en-3-backends)), escribir contraseñas con solo letras y números en `POSTGRES_PASSWORD` y `DD_POSTGRES_PASSWORD`, y llenar `DD_API_KEY` y `DD_SITE` solo si se va a usar Datadog ([sección 7](#7-datadog-agent-y-cuenta)).
 3. Construir y levantar todo: `docker compose up -d --build`
 4. Revisar el estado: `docker compose ps`
    Debes ver: `db`, `backend1`, `backend2` y `backend3` en `(healthy)`.
@@ -417,7 +422,7 @@ Debes ver: `{"code":"TS-...","section":"Platea",...}`. Si repites el último com
 ### 6.4 Base de datos
 
 - Servicio `db` (PostgreSQL 17.11), solo dentro de `cluster-net`, con el volumen `pg-data` (guarda los datos aunque se borre el contenedor; para volver a los datos iniciales, ver la [sección 4](#4-despliegue-rápido)). El esquema y el seed (`db/init/`) se cargan la primera vez.
-- **Reserva atómica** (todo o nada): una sola consulta aparta la silla solo si sigue libre y crea la reserva en la misma transacción. Dos personas no pueden apartar la misma silla: probado con 30 a la vez, una recibe 201 y las demás 409.
+- **Reserva atómica** (todo o nada): dos consultas en una sola transacción. Un `UPDATE` aparta la silla solo si sigue libre y un `INSERT` crea la reserva; si algo falla, no se guarda ninguna de las dos. Dos personas no pueden apartar la misma silla: probado con 30 a la vez, una recibe 201 y las demás 409.
 - Si la base no responde: la API da 503 en JSON, las páginas muestran "Servicio no disponible", y queda una línea de log `ERROR`.
 - Conexiones: cada worker abre una por hilo (4). Con 4 workers por backend: 4 × 4 × 3 = 48, por debajo del máximo de 100 de PostgreSQL.
 
@@ -476,62 +481,115 @@ Debes ver: `71 passed`. Se usa `127.0.0.1` y no `localhost`: en Windows, `localh
 
 <sub>👤 Responsable: Jhon Galvis</sub>
 
+El **Datadog Agent** (un programa que corre junto a los demás contenedores) recoge métricas, logs y chequeos de HAProxy, los backends y PostgreSQL, y los envía a Datadog. Allí se ven en dashboards y disparan monitores.
+
 ### 7.1 Cuenta y variables de entorno
-Para realizar el monitoreo se creó una cuenta de Datadog en la región US1 (`datadoghq.com`). La cuenta se encuentra en período de prueba gratuito y su fecha exacta de vencimiento es el martes 17 de Noviembre.
 
-La API key se obtiene desde **Organization Settings → API Keys**. Esta clave permite que el Agent envíe la información a Datadog.
-Para configurar las credenciales, se copia `.env.example` como `.env` y se completan las siguientes variables:
+- Cuenta en la región US1 (`datadoghq.com`), con la **prueba gratuita de 14 días** que empezó el 6 de noviembre y **vence el 20 de noviembre** (el 12 de noviembre, Plan & Usage mostraba "8 days left"). La entrega es el **martes 17 de noviembre**.
+- La API key (la clave con la que el Agent envía datos a la cuenta) se saca de **Organization Settings → API Keys**.
+- Variables del `.env` (nunca se sube a GitHub):
 
-- `DD_API_KEY`: clave de API de la organización.
-- `DD_SITE`: `datadoghq.com`.
-El archivo `.env` está excluido mediante `.gitignore` para evitar publicar credenciales en GitHub.
+| Variable | Para qué |
+|---|---|
+| `DD_API_KEY` | Clave de la organización |
+| `DD_SITE` | `datadoghq.com` |
+| `DD_POSTGRES_PASSWORD` | Contraseña del usuario `datadog` de PostgreSQL ([ver 7.7](#77-postgresql)); obligatoria, solo letras y números |
 
-### 7.2 Configuración de Datadog Agent
-Se integró Datadog Agent 7.85.1 como un servicio adicional de Docker Compose, identificado como `datadog-agent`, dentro de la red `cluster-net`.
-La configuración general se encuentra en `datadog/datadog.yaml`. Allí se habilita la recolección de logs y se establecen las etiquetas `env:lab` y `project:haproxy-telematicos`.
-El Agent utiliza el socket Docker para detectar contenedores y eventos. También comparte el volumen `haproxy-socket`, con acceso mediante el grupo 99, para consultar las estadísticas de HAProxy.
+### 7.2 Configuración del Agent
+
+- Servicio `datadog-agent` (Agent 7.85.1) en `cluster-net`, con `restart: unless-stopped` (se vuelve a levantar solo si se cae).
+- `datadog/datadog.yaml` activa los logs y pone las etiquetas `env:lab` y `project:haproxy-telematicos` a todo lo que se envía.
+- El Agent lee el socket de Docker para ver los contenedores y sus etiquetas (**Autodiscovery**: el Agent arma los checks a partir de etiquetas puestas en cada contenedor). También comparte el volumen `haproxy-socket` (grupo 99) para leer las estadísticas de HAProxy.
+
+| Check (integración de Datadog) | Qué vigila | Dónde está la configuración | Frecuencia |
+|---|---|---|---|
+| `haproxy` | Estado y tráfico de HAProxy y de cada backend | `datadog/conf.d/haproxy.d/conf.yaml` | Cada 5 s |
+| `openmetrics` (× 3) | `/metrics` de cada backend | Etiquetas de `backend1` a `backend3` en el compose | Cada 15 s |
+| `http_check` | El cliente misterioso ([7.6](#76-cliente-misterioso-http_check)) | `datadog/conf.d/http_check.d/conf.yaml` | Cada 15 s |
+| `postgres` | PostgreSQL ([7.7](#77-postgresql)) | Etiqueta del servicio `db` en el compose | Cada 15 s |
 
 ### 7.3 Integración con HAProxy
-La configuración se encuentra en `datadog/conf.d/haproxy.d/conf.yaml`.
-Se utiliza el socket Unix `/var/lib/haproxy/admin.sock` mediante la integración heredada de HAProxy, con `use_openmetrics` y `use_prometheus` desactivados.
-Se habilitaron las opciones `enable_service_check` y `collect_status_metrics` para recopilar estadísticas de disponibilidad. También se configuró `disable_legacy_service_tag` para utilizar la etiqueta actual `haproxy_service`.
-La integración se verificó mediante `agent status` y `agent check haproxy`. Se obtuvieron 94 muestras de métricas y cuatro service checks por ejecución, incluidos los estados individuales de los tres backends.
 
-### 7.4 Métricas de los backends con OpenMetrics
-Las métricas HTTP se recolectan desde los endpoints `/metrics` de `backend1`, `backend2` y `backend3`, por el puerto interno 5000.
-La configuración se encuentra en `datadog/conf.d/openmetrics.d/conf.yaml`, donde se definieron tres instancias utilizando el namespace `backend`.
-Se confirmó la recepción de las siguientes métricas:
-- `backend.http_requests.count`
-- `backend.http_request_duration_seconds.sum`
-- `backend.http_request_duration_seconds.count`
-- `backend.http_request_duration_seconds.bucket`
+- Lee el socket Unix `/var/lib/haproxy/admin.sock` con la versión heredada de la integración (`use_openmetrics: false`), que da el service check `haproxy.backend_up` (el que usa el monitor de backend caído).
+- Lee la planilla cada **5 s** (`min_collection_interval: 5`; por defecto son 15). Medido: HAProxy marca un backend `DOWN` unos 4 s después de detenerlo y el Agent lo recoge en su siguiente lectura, así que la caída se ve en Datadog en **unos 5 a 10 s**.
+- Cada lectura envía 94 métricas y 4 service checks (uno por backend y uno general).
 
-Las métricas incluyen la etiqueta `backend`, que permite distinguir cada servidor.
+### 7.4 Métricas de los backends (OpenMetrics por Autodiscovery)
 
-Se intentó inicialmente utilizar Autodiscovery mediante etiquetas Docker para OpenMetrics, pero no se cargó la integración. Por este motivo se utilizó un archivo de configuración montado en el Agent, comprobando su funcionamiento con las tres instancias en estado OK.
+- Cada backend tiene la etiqueta `com.datadoghq.ad.checks` en el compose, con su `/metrics`, el namespace `backend` y la etiqueta `backend:backendN`. Ya no existe `datadog/conf.d/openmetrics.d/`.
+- Formato (Agent 7.36 o más nuevo): el JSON va entre **comillas simples** para que YAML lo deje como texto:
+  `com.datadoghq.ad.checks: '{"openmetrics": {"instances": [{"openmetrics_endpoint": "http://backend1:5000/metrics", ...}]}}'`
+- Las métricas tienen los **mismos nombres y etiquetas** que antes: `backend.http_requests.count` y `backend.http_request_duration_seconds.{sum,count,bucket}`, con `backend`, `endpoint`, `handler`, `method` y `status`. Autodiscovery agrega etiquetas del contenedor (`image_name`, `short_image`, ...), que no cambian ninguna consulta.
+- El primer intento de Jhon con etiquetas no quedó en el historial de Git, así que la causa más probable (no confirmada) fue el formato del JSON. Los logs por etiquetas sí funcionaban, o sea que el Agent ya leía las etiquetas.
 
 ### 7.5 Recolección de logs
-Se configuró la recolección selectiva de logs mediante etiquetas Docker `com.datadoghq.ad.logs` en HAProxy y los tres backends.
-Los registros se identifican con los servicios `haproxy`, `backend1`, `backend2` y `backend3`.
-Se comprobó en Log Explorer que los registros JSON de HAProxy se reciben con atributos separados, entre ellos `backend`, `server`, `status_code`, `response_ms` y `total_ms`.
-A partir del atributo numérico `@total_ms` se creó la medida **HAProxy Total Latency**, en milisegundos, para analizar la latencia de las peticiones y calcular percentiles.
-Los mensajes informativos de arranque que aparecen como Error pueden provenir de la salida estándar de error. Para distinguir errores HTTP reales se recomienda consultar el atributo `status_code`.
 
-### 7.6 Eventos y pruebas de disponibilidad
-Se confirmó la recepción de eventos Docker en Event Explorer.
-Para comprobar la detección de fallos se detuvo temporalmente `backend2` mediante `docker compose stop backend2`.
-La integración generó el service check `haproxy.backend_up` con estado `CRITICAL` (`status: 2`) y etiqueta `backend:backend2`. Al mismo tiempo, HAProxy continuó atendiendo las peticiones mediante `backend1` y `backend3`.
-Posteriormente se restauró el contenedor mediante `docker compose start backend2` y se confirmó que los tres servidores regresaron al estado OK (`status: 0`).
-La creación de dashboards y monitores de alertas corresponde al integrante responsable de esa parte.
+- Solo se recogen los contenedores que tienen la etiqueta `com.datadoghq.ad.logs`: `haproxy`, `backend1` a `backend3` (source `python`) y `db` (source `postgresql`).
+- HAProxy, la app y Gunicorn escriben **JSON con su nivel real** (`INFO`, `WARNING`, `ERROR`), así que Datadog clasifica bien cada línea.
+- Los logs de HAProxy llegan con atributos separados (`backend`, `server`, `status_code`, `response_ms`, `total_ms`). Con `@total_ms` se creó la medida **HAProxy Total Latency** (en milisegundos) para ver percentiles.
 
-### 7.7 Comandos de verificación
-- `docker compose ps`: comprobar el estado de los contenedores.
-- `docker compose exec -T datadog-agent agent status`: verificar las integraciones y el envío de información.
-- `docker compose exec -T datadog-agent agent check haproxy`: consultar métricas y service checks de HAProxy.
-- `docker compose exec -T datadog-agent agent check openmetrics`: comprobar las tres instancias de OpenMetrics.
+### 7.6 Cliente misterioso (http_check)
 
-Las métricas se consultan en **Metrics Explorer**, los registros en **Log Explorer** y los eventos de contenedores en **Event Management → All Events**.
+Cada 15 s el Agent pide la cartelera como lo haría un usuario, aunque no haya tráfico. Sirve para detectar "la base cayó y el semáforo sigue verde": HAProxy revisa `/health`, que no usa la base, así que sigue viendo los backends sanos.
 
+- Pide `http://haproxy:8080/api/events` (pasa por HAProxy, un backend y PostgreSQL), espera hasta 10 s y solo acepta un `200`.
+- En Datadog: métricas `network.http.response_time` y `network.http.can_connect`, y service check `http.can_connect`, con la etiqueta `instance:taquilla_api_events`.
+- Con la base caída, el check queda CRITICAL con el mensaje `Expected 200, got 503` (el backend espera 5 s al pool y responde 503). Al volver la base, tarda unos 15 a 30 s en pasar a OK, mientras los backends se reconectan.
+- Estas peticiones aparecen en las métricas y logs de HAProxy y de los backends (unas 4 por minuto). Los logs no guardan el User-Agent (el navegador o programa que pide), así que se filtran por ruta e IP del Agent:
+  - Logs de HAProxy: `service:haproxy @path:"/api/events" @client_ip:<IP del Agent>`. La IP se ve con `docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" datadog-agent`.
+  - Métricas de los backends: el `handler:/api/events` incluye estas peticiones.
+
+### 7.7 PostgreSQL
+
+- Usuario **`datadog` de solo lectura** (rol `pg_monitor`), creado por `db/init/03_datadog_user.sh` con la contraseña `DD_POSTGRES_PASSWORD`. Ese script solo corre al crear `pg-data`: si la base ya existía, hay que recrear el volumen ([sección 4](#4-despliegue-rápido)).
+- El check va en la etiqueta del servicio `db` con `"password": "%%env_DD_POSTGRES_PASSWORD%%"`: el Agent la reemplaza con **su propia** variable de entorno, así que la contraseña no queda en ningún archivo del repo.
+- `relations` con las tablas `seats` y `reservations` activa las métricas por tabla y la de bloqueos.
+- `log_min_duration_statement=250`: toda consulta que tarde más de 250 ms queda en el log de `db` (`service:db` en Log Explorer).
+
+| Métrica | Qué dice en la venta flash |
+|---|---|
+| `postgresql.connections` | Conexiones abiertas (con 4 workers por backend llegan a 48) |
+| `postgresql.percent_usage_connections` | Fracción del máximo de 100 conexiones en uso |
+| `postgresql.commits` · `postgresql.rollbacks` | Transacciones confirmadas y deshechas por segundo |
+| `postgresql.locks` | Bloqueos activos, por tabla y tipo (por ejemplo en `seats`) |
+| `postgresql.deadlocks.count` | Bloqueos mutuos (deberían quedarse en 0) |
+
+### 7.8 Eventos y pruebas de disponibilidad
+
+- Los eventos de Docker (contenedor detenido, iniciado) llegan a **Event Management → All Events**.
+- Prueba hecha por Jhon: con `docker compose stop backend2`, el service check `haproxy.backend_up` pasó a `CRITICAL` con `backend:backend2`, y HAProxy siguió atendiendo con `backend1` y `backend3`. Con `docker compose start backend2` volvió a OK.
+
+### 7.9 Comandos de verificación
+
+```powershell
+docker compose exec -T datadog-agent agent status
+```
+Debes ver: `API Key valid` y los checks `haproxy`, `http_check`, `openmetrics` y `postgres` sin errores.
+
+```powershell
+docker compose exec -T datadog-agent agent configcheck
+```
+Debes ver: `haproxy` y `http_check` desde archivo (`Configuration provider: file`), y `postgres` y tres `openmetrics` desde contenedores (`Configuration source: container:docker://...`).
+
+```powershell
+docker compose exec -T datadog-agent agent check haproxy
+docker compose exec -T datadog-agent agent check http_check
+docker compose exec -T datadog-agent agent check postgres
+docker compose exec -T datadog-agent agent check openmetrics
+```
+Debes ver: los service checks en `"status": 0` (OK). `agent check openmetrics` a veces corre solo las instancias que encuentra a tiempo; para una en particular: `--instance-filter '.openmetrics_endpoint == "http://backend2:5000/metrics"'`.
+
+Simulacro de base caída:
+```powershell
+docker compose stop db
+docker compose exec -T datadog-agent agent check http_check
+docker compose start db
+```
+Debes ver: con la base apagada, `http.can_connect` en `"status": 2` con `Expected 200, got 503`, y la página <http://localhost:8080> mostrando "Servicio no disponible".
+
+En Datadog: **Metrics Explorer** (`postgresql.connections`, `network.http.response_time`, `backend.http_requests.count`) y **Log Explorer** (`service:db`, `service:haproxy`).
+
+---
 
 ## 8. Dashboard y monitores
 
@@ -745,9 +803,10 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 <details>
 <summary>OpenMetrics no aparece en Datadog Agent</summary>
 
-- **Causa:** durante las pruebas, el Agent reconocía los contenedores Docker, pero no cargaba la integración OpenMetrics mediante etiquetas de Autodiscovery.
-- **Solución:** se configuraron los tres backends directamente en `datadog/conf.d/openmetrics.d/conf.yaml` y se montó el archivo en el contenedor del Agent. Después se comprobó con `agent status` que las tres instancias estaban en estado OK.
-- <sub>Agregado por: Jhon</sub>
+- **Causa probable (no confirmada):** el formato del JSON en las etiquetas de Autodiscovery. El intento no quedó en el historial de Git; los logs por etiquetas sí funcionaban.
+- **Solución temporal:** se usó un archivo montado, `datadog/conf.d/openmetrics.d/conf.yaml`.
+- **Solución actual:** funciona por etiquetas `com.datadoghq.ad.checks` en los backends, con el JSON entre comillas simples, y el archivo se quitó ([ver 7.4](#74-métricas-de-los-backends-openmetrics-por-autodiscovery)). Se comprueba con `agent configcheck -v`.
+- <sub>Agregado por: Jhon · actualizado por: Manuel</sub>
 
 </details>
 
@@ -774,6 +833,7 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 
 - **Causa probable:** los mensajes de arranque de HAProxy y Gunicorn se escriben en `stderr`, que Datadog puede clasificar como Error.
 - **Solución:** se comprobó que eran mensajes informativos y no errores HTTP. Para consultar fallos reales se recomienda utilizar el atributo `status_code` de los logs JSON.
+- **Resuelto en la fase 1:** Gunicorn y la app escriben JSON por `stdout` con su nivel real ([ver 7.5](#75-recolección-de-logs)).
 - <sub>Agregado por: Jhon</sub>
 
 </details>
@@ -783,7 +843,17 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 
 - **Causa probable:** Gunicorn utiliza dos workers que mantienen sus contadores de Prometheus de forma independiente.
 - **Solución pendiente:** se propuso al responsable de los backends utilizar un worker con cuatro threads o configurar Prometheus en modo multiproceso. El Agent ya recopila métricas de los tres servidores, pero falta validar su exactitud después de este ajuste.
+- **Resuelto en la fase 1:** prometheus-client en modo multiproceso; `/metrics` suma los contadores de todos los workers ([ver 6.5](#65-métricas-y-logs)).
 - <sub>Agregado por: Jhon</sub>
 
 </details>
 
+<details>
+<summary><code>datadog-agent</code> en <code>Exited (1)</code> o reiniciándose (<code>Restarting</code>)</summary>
+
+- **Causa:** casi siempre falta `DD_API_KEY` o `DD_SITE` en `.env`, o la clave no es válida.
+- **Cómo verlo:** `docker compose logs datadog-agent --tail 20`.
+- **Solución:** llenar las dos variables en `.env` ([ver 7.1](#71-cuenta-y-variables-de-entorno)) y ejecutar `docker compose up -d datadog-agent`. Debes ver `API Key valid` en `docker compose exec -T datadog-agent agent status`.
+- <sub>Agregado por: Manuel</sub>
+
+</details>
