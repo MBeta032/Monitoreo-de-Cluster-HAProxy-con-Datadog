@@ -64,9 +64,17 @@ def record_metrics_and_log(response):
     # Excluir /health y /metrics de contadores, latencias y logs
     if path not in EXCLUDED_PATHS:
         duration = time.time() - getattr(request, '_start_time', time.time())
-        
-        HTTP_REQUESTS_TOTAL.labels(method=method, handler=path, status=status_code).inc()
-        HTTP_REQUEST_DURATION_SECONDS.labels(method=method, handler=path).observe(duration)
+
+        # El label handler usa la ruta plantilla de Flask (por ejemplo /api/events/<int:event_id>)
+        # y no la ruta escrita por el usuario, para no crear una serie por cada URL distinta.
+        # Si ninguna ruta coincide (404 o 405), se usa un valor fijo.
+        if request.url_rule is not None:
+            handler_label = request.url_rule.rule
+        else:
+            handler_label = "unmatched"
+
+        HTTP_REQUESTS_TOTAL.labels(method=method, handler=handler_label, status=status_code).inc()
+        HTTP_REQUEST_DURATION_SECONDS.labels(method=method, handler=handler_label).observe(duration)
         
         # Log de aplicacion estructurado en JSON
         log_payload = {
