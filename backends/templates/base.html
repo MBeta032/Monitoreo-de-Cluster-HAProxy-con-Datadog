@@ -10,6 +10,8 @@
   <header class="site-header">
     <a class="brand" href="{{ url_for('index') }}">Boletería Cali</a>
     <div class="user-nav">
+      <a href="{{ url_for('index') }}">Cartelera</a>
+      <a href="{{ url_for('reservations_page') }}">Mis reservas</a>
       {% if current_user %}
       <span>{{ current_user.name }}</span>
       <form method="post" action="{{ url_for('logout') }}">
@@ -22,19 +24,17 @@
     </div>
   </header>
 
-  {# Barra de pasos: cada página define current_step (1 Eventos, 2 Sillas, 3 Confirmación) #}
+  {# Barra de pasos de la reserva: cada página define current_step (1 Ubicación, 2 Confirmar, 3 Listo).
+     Los pasos anteriores al actual se marcan como hechos (✓). #}
   {% if current_step %}
-  <nav class="steps" aria-label="Pasos de la compra">
+  <nav class="steps" aria-label="Pasos de la reserva">
     <ol>
-      <li class="step {% if current_step == 1 %}current{% endif %}" data-step="1">
-        <a href="{{ url_for('index') }}"><span class="step-number">1</span> Eventos</a>
+      {% for step_name in ["Ubicación", "Confirmar", "Listo"] %}
+      {% set step_number = loop.index %}
+      <li class="step {% if step_number == current_step %}current{% elif step_number < current_step %}done{% endif %}">
+        <span class="step-number">{% if step_number < current_step %}✓{% else %}{{ step_number }}{% endif %}</span> {{ step_name }}
       </li>
-      <li class="step {% if current_step == 2 %}current{% endif %}" data-step="2">
-        <span class="step-number">2</span> Sillas
-      </li>
-      <li class="step {% if current_step == 3 %}current{% endif %}" data-step="3">
-        <span class="step-number">3</span> Confirmación
-      </li>
+      {% endfor %}
     </ol>
   </nav>
   {% endif %}

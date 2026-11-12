@@ -66,13 +66,15 @@ def get_user(user_id):
             return cur.fetchone()
 
 
+
 def list_events():
-    # Eventos con el total de sillas y cuántas quedan libres
+    # Eventos de la cartelera con el total de sillas y cuántas quedan libres
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
-                SELECT events.id, events.name, events.venue, events.starts_at,
+                SELECT events.id, events.name, events.category, events.venue, events.starts_at,
+                       events.is_flash_sale,
                        count(seats.id) FILTER (WHERE seats.status = 'available') AS available_seats,
                        count(seats.id) AS total_seats
                 FROM events
@@ -90,7 +92,8 @@ def get_event(event_id):
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
-                SELECT events.id, events.name, events.venue, events.starts_at,
+                SELECT events.id, events.name, events.category, events.venue, events.starts_at,
+                       events.is_flash_sale,
                        count(seats.id) FILTER (WHERE seats.status = 'available') AS available_seats,
                        count(seats.id) AS total_seats
                 FROM events
@@ -103,8 +106,27 @@ def get_event(event_id):
             return cur.fetchone()
 
 
+def list_sections(event_id):
+    # Zonas del evento con sus sillas libres y totales, en el orden del seed (por el primer id)
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT section,
+                       count(*) FILTER (WHERE status = 'available') AS available_seats,
+                       count(*) AS total_seats
+                FROM seats
+                WHERE event_id = %s
+                GROUP BY section
+                ORDER BY min(id)
+                """,
+                (event_id,),
+            )
+            return cur.fetchall()
+
+
 def list_seats(event_id):
-    # Sillas del evento con su estado. No incluye los datos del comprador: esta lista es pública.
+    # Todas las sillas del evento con su estado (no dice quién reservó: esta lista es pública)
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
@@ -119,27 +141,42 @@ def list_seats(event_id):
             return cur.fetchall()
 
 
-def purchase_seat(event_id, seat_id, buyer_name, buyer_email):
-    # Vende la silla en una sola consulta, solo si sigue libre.
-    # Si dos compradores llegan al tiempo, PostgreSQL hace esperar al segundo; cuando el
-    # primero termina, la silla ya no está 'available' y el segundo no actualiza nada.
-    # Devuelve la silla vendida, o None si no se pudo vender (no existe o ya estaba vendida).
+def list_section_seats(event_id, section):
+    # Solo las sillas de una zona del evento
     with pool.connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
-                UPDATE seats
-                SET status = 'sold', buyer_name = %s, buyer_email = %s, sold_at = now()
-                WHERE id = %s AND event_id = %s AND status = 'available'
-                RETURNING id, event_id, section, seat_row, seat_number, status, sold_at
+                SELECT id, section, seat_row, seat_number, status
+                FROM seats
+                WHERE event_id = %s AND section = %s
+                ORDER BY id
                 """,
-                (buyer_name, buyer_email, seat_id, event_id),
+                (event_id, section),
+            )
+            return cur.fetchall()
+
+
+def get_seat(event_id, seat_id):
+    # Una silla con los datos de su evento (para la página Confirmar), o None si no existe en ese evento
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT seats.id, seats.section, seats.seat_row, seats.seat_number, seats.status,
+                       events.id AS event_id, events.name AS event_name, events.category,
+                       events.venue, events.starts_at
+                FROM seats
+                JOIN events ON events.id = seats.event_id
+                WHERE seats.id = %s AND seats.event_id = %s
+                """,
+                (seat_id, event_id),
             )
             return cur.fetchone()
 
 
 def seat_exists(event_id, seat_id):
-    # Sirve para distinguir entre "la silla no existe en este evento" (404) y "ya fue vendida" (409)
+    # Sirve para distinguir entre "la silla no existe en este evento" (404) y "ya fue reservada" (409)
     with pool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -147,3 +184,89 @@ def seat_exists(event_id, seat_id):
                 (seat_id, event_id),
             )
             return cur.fetchone() is not None
+
+
+def reserve_seat(event_id, seat_id, user_id):
+    # Aparta la silla y crea la reserva en UNA sola transacción (la de pool.connection(),
+    # que hace commit al final): o se hacen las dos cosas, o ninguna.
+    # El UPDATE solo cambia la silla si sigue libre. Si dos personas llegan al tiempo,
+    # PostgreSQL hace esperar a la segunda; cuando la primera termina, la silla ya no está
+    # 'available' y la segunda no actualiza nada.
+    # Devuelve la reserva, o None si no se pudo (la silla no existe o ya estaba reservada).
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                UPDATE seats
+                SET status = 'reserved'
+                WHERE id = %s AND event_id = %s AND status = 'available'
+                RETURNING id, section, seat_row, seat_number
+                """,
+                (seat_id, event_id),
+            )
+            seat = cur.fetchone()
+            if seat is None:
+                return None
+
+            cur.execute(
+                """
+                INSERT INTO reservations (seat_id, user_id)
+                VALUES (%s, %s)
+                RETURNING id, created_at
+                """,
+                (seat_id, user_id),
+            )
+            reservation = cur.fetchone()
+
+    return {
+        "id": reservation["id"],
+        "created_at": reservation["created_at"],
+        "event_id": event_id,
+        "seat_id": seat["id"],
+        "section": seat["section"],
+        "seat_row": seat["seat_row"],
+        "seat_number": seat["seat_number"],
+    }
+
+
+def list_user_reservations(user_id):
+    # Reservas de un usuario con los datos del evento y la silla
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT reservations.id, reservations.created_at,
+                       events.id AS event_id, events.name AS event_name, events.category,
+                       events.venue, events.starts_at,
+                       seats.id AS seat_id, seats.section, seats.seat_row, seats.seat_number
+                FROM reservations
+                JOIN seats ON seats.id = reservations.seat_id
+                JOIN events ON events.id = seats.event_id
+                WHERE reservations.user_id = %s
+                ORDER BY events.starts_at, reservations.id
+                """,
+                (user_id,),
+            )
+            return cur.fetchall()
+
+
+def get_reservation(reservation_id, user_id):
+    # Una reserva SOLO si es del usuario indicado. La de otro usuario se trata como inexistente (404).
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT reservations.id, reservations.created_at,
+                       events.id AS event_id, events.name AS event_name, events.category,
+                       events.venue, events.starts_at,
+                       seats.id AS seat_id, seats.section, seats.seat_row, seats.seat_number,
+                       users.name AS user_name, users.email AS user_email
+                FROM reservations
+                JOIN seats ON seats.id = reservations.seat_id
+                JOIN events ON events.id = seats.event_id
+                JOIN users ON users.id = reservations.user_id
+                WHERE reservations.id = %s AND reservations.user_id = %s
+                """,
+                (reservation_id, user_id),
+            )
+            return cur.fetchone()

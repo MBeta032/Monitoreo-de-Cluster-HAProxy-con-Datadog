@@ -51,25 +51,27 @@ def test_unknown_route_uses_unmatched_handler(client):
     assert 'http_requests_total{handler="unmatched",method="GET",status="404"}' in metrics_text
 
 
-# Estas dos no necesitan base de datos: la validación ocurre antes de consultarla
+# Estas no necesitan base de datos: sin sesión la API responde 401 antes de consultarla
 
-def test_purchase_without_email_returns_400(client):
-    response = client.post(
-        "/api/events/1/seats/1/purchase",
-        json={"buyer_name": "Ana Pérez"},
-    )
+def test_reserve_without_session_returns_401(client):
+    response = client.post("/api/events/1/seats/1/reserve")
 
-    assert response.status_code == 400
-    assert "buyer_email" in response.get_json()["message"]
+    assert response.status_code == 401
 
 
-def test_purchase_with_invalid_email_returns_400(client):
-    response = client.post(
-        "/api/events/1/seats/1/purchase",
-        json={"buyer_name": "Ana Pérez", "buyer_email": "ana@correo"},
-    )
+def test_my_reservations_api_without_session_returns_401(client):
+    response = client.get("/api/reservations")
 
-    assert response.status_code == 400
+    assert response.status_code == 401
+
+
+def test_confirm_page_without_session_redirects_to_login_with_next(client):
+    response = client.get("/events/1/confirm?seat=5")
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert location.startswith("/login?")
+    assert "next=/events/1/confirm?seat%3D5" in location
 
 
 def test_database_down_returns_503_and_logs_error(client, log_stream, unreachable_database):

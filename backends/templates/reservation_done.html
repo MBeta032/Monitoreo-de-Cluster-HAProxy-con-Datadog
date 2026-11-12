@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% set current_step = 3 %}
+
+{% block title %}Reserva confirmada - Boletería Cali{% endblock %}
+
+{% block content %}
+<div class="done-box">
+  <div class="done-check">✓</div>
+  <h1 class="page-title">¡Reserva confirmada!</h1>
+
+  <section class="card ticket">
+    <p class="muted">CÓDIGO DE RESERVA</p>
+    <p class="ticket-code">{{ reservation.id | reservation_code }}</p>
+    <p><span class="badge-confirmed">Confirmada</span></p>
+    <h2>{{ reservation.event_name }}</h2>
+    <p class="event-detail">{{ reservation.venue }} · {{ reservation.starts_at.strftime("%d/%m/%Y · %H:%M") }} h</p>
+    <dl class="summary-list">
+      <div><dt>Zona</dt><dd>{{ reservation.section }}</dd></div>
+      <div><dt>Fila</dt><dd>{{ reservation.seat_row }}</dd></div>
+      <div><dt>Silla</dt><dd>{{ reservation.seat_number }}</dd></div>
+      <div><dt>Nombre</dt><dd>{{ reservation.user_name }}</dd></div>
+    </dl>
+  </section>
+
+  <p>
+    <a class="button-primary" href="{{ url_for('reservations_page') }}">Ver mis reservas</a>
+    <a href="{{ url_for('index') }}">Volver a la cartelera</a>
+  </p>
+</div>
+{% endblock %}

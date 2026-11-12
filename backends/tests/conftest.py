@@ -82,7 +82,7 @@ def database(test_pool, monkeypatch):
     schema_sql = (DB_INIT_DIR / "01_schema.sql").read_text(encoding="utf-8")
     seed_sql = (DB_INIT_DIR / "02_seed.sql").read_text(encoding="utf-8")
     with test_pool.connection() as conn:
-        conn.execute("DROP TABLE IF EXISTS seats, events, users")
+        conn.execute("DROP TABLE IF EXISTS reservations, seats, events, users")
         # Sin parámetros, psycopg permite varias sentencias en un mismo execute
         conn.execute(schema_sql)
         conn.execute(seed_sql)

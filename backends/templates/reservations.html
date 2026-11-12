@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Mis reservas - Boletería Cali{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('index') }}">← Volver a la cartelera</a></p>
+<h1 class="page-title">Mis reservas</h1>
+
+{% if reservations %}
+<ul class="reservation-list">
+  {% for reservation in reservations %}
+  <li class="card reservation-item">
+    <h2>{{ reservation.event_name }}</h2>
+    <p class="event-detail">{{ reservation.venue }} · {{ reservation.starts_at.strftime("%d/%m/%Y · %H:%M") }} h</p>
+    <p>{{ reservation.section }} · Fila {{ reservation.seat_row }} · Silla {{ reservation.seat_number }}</p>
+    <p>
+      <a href="{{ url_for('reservation_page', reservation_id=reservation.id) }}">{{ reservation.id | reservation_code }}</a>
+      <span class="badge-confirmed">Confirmada</span>
+    </p>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>Aún no tienes reservas. <a href="{{ url_for('index') }}">Ver la cartelera</a></p>
+{% endif %}
+{% endblock %}

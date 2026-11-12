@@ -130,14 +130,20 @@ def inject_common_values():
         "csrf_token": auth.get_csrf_token,
     }
 
-def group_seats(seats):
-    # Agrupa las sillas por sección y por fila, en el mismo orden en que llegan de la base.
-    # Resultado: {"Preferencial": {"A": [silla, silla, ...], "B": [...]}, "General": {...}}
-    sections = {}
+def reservation_code(reservation_id):
+    # Código que ve el usuario: "TS-" más el id con 6 dígitos (TS-000482)
+    return f"TS-{reservation_id:06d}"
+
+# Las plantillas lo usan como filtro: {{ reservation.id | reservation_code }}
+app.add_template_filter(reservation_code)
+
+def group_seats_by_row(seats):
+    # Agrupa las sillas de una zona por fila, en el mismo orden en que llegan de la base.
+    # Resultado: {"A": [silla, silla, ...], "B": [...]}
+    rows = {}
     for seat in seats:
-        rows = sections.setdefault(seat["section"], {})
         rows.setdefault(seat["seat_row"], []).append(seat)
-    return sections
+    return rows
 
 @app.route('/')
 def index():
@@ -146,11 +152,88 @@ def index():
 
 @app.route('/events/<int:event_id>')
 def event_page(event_id):
+    # Nivel 1: plano de zonas. Nivel 2 (?section=<zona>): las sillas de esa zona.
+    # Si el evento tiene una sola zona, se muestran sus sillas directamente.
     event = db.get_event(event_id)
     if event is None:
         abort(404)
-    seats = db.list_seats(event_id)
-    return render_template("event.html", event=event, sections=group_seats(seats))
+    sections = db.list_sections(event_id)
+
+    selected_name = request.args.get("section")
+    if selected_name is None and len(sections) == 1:
+        selected_name = sections[0]["section"]
+    if selected_name is None:
+        return render_template("venue_map.html", event=event, sections=sections)
+
+    selected_section = None
+    for section in sections:
+        if section["section"] == selected_name:
+            selected_section = section
+    if selected_section is None:
+        abort(404)
+
+    seats = db.list_section_seats(event_id, selected_name)
+    return render_template(
+        "event.html",
+        event=event,
+        section=selected_section,
+        rows=group_seats_by_row(seats),
+        has_many_sections=len(sections) > 1,
+    )
+
+# --- Reserva: confirmar, listo y mis reservas ---
+
+@app.route('/events/<int:event_id>/confirm')
+def confirm_page(event_id):
+    seat_id = request.args.get("seat", type=int)
+    if seat_id is None:
+        abort(404)
+    # Sin sesión: primero iniciar sesión y volver aquí. Se pasa también la silla
+    # para que la página de inicio de sesión muestre qué se está reservando.
+    if auth.get_current_user() is None:
+        return redirect(url_for("login", next=request.full_path, seat=seat_id))
+
+    seat = db.get_seat(event_id, seat_id)
+    if seat is None:
+        abort(404)
+    seat_taken = seat["status"] != "available"
+    return render_template("confirm.html", seat=seat, seat_taken=seat_taken)
+
+@app.route('/events/<int:event_id>/confirm', methods=['POST'])
+@auth.login_required
+def confirm_reservation(event_id):
+    if not auth.csrf_token_is_valid(request.form.get("csrf_token")):
+        abort(403)
+    seat_id = request.form.get("seat_id", type=int)
+    if seat_id is None:
+        abort(404)
+
+    user = auth.get_current_user()
+    reservation = db.reserve_seat(event_id, seat_id, user["id"])
+    if reservation is not None:
+        # Patrón POST/Redirect/GET: recargar la página Listo no repite la reserva
+        return redirect(url_for("reservation_page", reservation_id=reservation["id"]), code=303)
+
+    # No se pudo reservar: la silla no existe en este evento, o alguien la reservó antes
+    seat = db.get_seat(event_id, seat_id)
+    if seat is None:
+        abort(404)
+    return render_template("confirm.html", seat=seat, seat_taken=True), 409
+
+@app.route('/reservations')
+@auth.login_required
+def reservations_page():
+    reservations = db.list_user_reservations(auth.get_current_user()["id"])
+    return render_template("reservations.html", reservations=reservations)
+
+@app.route('/reservations/<int:reservation_id>')
+@auth.login_required
+def reservation_page(reservation_id):
+    # Pantalla "Listo". Solo la ve el dueño de la reserva: la de otro usuario da 404.
+    reservation = db.get_reservation(reservation_id, auth.get_current_user()["id"])
+    if reservation is None:
+        abort(404)
+    return render_template("reservation_done.html", reservation=reservation)
 
 # --- Cuentas: iniciar sesión, crear cuenta y cerrar sesión ---
 
@@ -255,10 +338,24 @@ def event_to_json(event):
     return {
         "id": event["id"],
         "name": event["name"],
+        "category": event["category"],
         "venue": event["venue"],
         "starts_at": event["starts_at"].isoformat(),
+        "is_flash_sale": event["is_flash_sale"],
         "available_seats": event["available_seats"],
         "total_seats": event["total_seats"],
+    }
+
+def reservation_to_json(reservation):
+    return {
+        "id": reservation["id"],
+        "code": reservation_code(reservation["id"]),
+        "created_at": reservation["created_at"].isoformat(),
+        "event_id": reservation["event_id"],
+        "seat_id": reservation["seat_id"],
+        "section": reservation["section"],
+        "seat_row": reservation["seat_row"],
+        "seat_number": reservation["seat_number"],
     }
 
 def is_valid_email(email):
@@ -273,25 +370,6 @@ def is_valid_email(email):
     if "." not in domain or domain.startswith(".") or domain.endswith("."):
         return False
     return True
-
-def validate_buyer(data):
-    # Devuelve el mensaje de error, o None si los datos del comprador están bien
-    if not isinstance(data, dict):
-        return "El cuerpo debe ser un JSON con buyer_name y buyer_email"
-
-    buyer_name = data.get("buyer_name")
-    if not isinstance(buyer_name, str) or buyer_name.strip() == "":
-        return "Falta el nombre del comprador (buyer_name)"
-    if len(buyer_name.strip()) > 100:
-        return "El nombre no puede tener más de 100 caracteres"
-
-    buyer_email = data.get("buyer_email")
-    if not isinstance(buyer_email, str) or buyer_email.strip() == "":
-        return "Falta el correo del comprador (buyer_email)"
-    if not is_valid_email(buyer_email.strip()):
-        return "El correo no es válido"
-
-    return None
 
 @app.route('/api/info')
 def api_info():
@@ -337,30 +415,44 @@ def api_get_event(event_id):
 
 @app.route('/api/events/<int:event_id>/seats')
 def api_list_seats(event_id):
+    # Con ?section=<zona> devuelve solo las sillas de esa zona
     event = db.get_event(event_id)
     if event is None:
         return jsonify({"error": "Not Found", "message": "El evento no existe"}), 404
-    seats = db.list_seats(event_id)
+
+    section = request.args.get("section")
+    if section is None:
+        seats = db.list_seats(event_id)
+    else:
+        seats = db.list_section_seats(event_id, section)
+        if len(seats) == 0:
+            return jsonify({"error": "Not Found", "message": "La zona no existe en este evento"}), 404
     return jsonify(seats), 200
 
-@app.route('/api/events/<int:event_id>/seats/<int:seat_id>/purchase', methods=['POST'])
-def api_purchase_seat(event_id, seat_id):
-    data = request.get_json(silent=True)
-    error_message = validate_buyer(data)
-    if error_message is not None:
-        return jsonify({"error": "Bad Request", "message": error_message}), 400
+@app.route('/api/events/<int:event_id>/seats/<int:seat_id>/reserve', methods=['POST'])
+def api_reserve_seat(event_id, seat_id):
+    user = auth.get_current_user()
+    if user is None:
+        return jsonify({"error": "Unauthorized", "message": "Inicia sesión con POST /api/login"}), 401
+    if not auth.csrf_token_is_valid(request.headers.get("X-CSRF-Token")):
+        return jsonify({"error": "Forbidden", "message": "Token CSRF inválido o ausente"}), 403
 
-    buyer_name = data["buyer_name"].strip()
-    buyer_email = data["buyer_email"].strip()
-    seat = db.purchase_seat(event_id, seat_id, buyer_name, buyer_email)
-    if seat is not None:
-        seat["sold_at"] = seat["sold_at"].isoformat()
-        return jsonify(seat), 201
+    reservation = db.reserve_seat(event_id, seat_id, user["id"])
+    if reservation is not None:
+        return jsonify(reservation_to_json(reservation)), 201
 
-    # No se vendió: o la silla no existe en este evento, o alguien la compró antes
+    # No se reservó: o la silla no existe en este evento, o alguien la reservó antes
     if db.seat_exists(event_id, seat_id):
-        return jsonify({"error": "Conflict", "message": "Esa silla ya fue vendida"}), 409
+        return jsonify({"error": "Conflict", "message": "Esa silla ya fue reservada"}), 409
     return jsonify({"error": "Not Found", "message": "La silla no existe en este evento"}), 404
+
+@app.route('/api/reservations')
+def api_list_reservations():
+    user = auth.get_current_user()
+    if user is None:
+        return jsonify({"error": "Unauthorized", "message": "Inicia sesión con POST /api/login"}), 401
+    reservations = db.list_user_reservations(user["id"])
+    return jsonify([reservation_to_json(reservation) for reservation in reservations]), 200
 
 @app.errorhandler(psycopg.OperationalError)
 def database_unavailable(error):

@@ -1,5 +1,5 @@
--- Datos iniciales: un concierto de venta flash y dos eventos pequeños para tráfico normal.
--- Los nombres de los eventos son inventados; los lugares son reales de Cali.
+-- Datos iniciales de la Taquilla Sucursal: usuarios de prueba, un concierto de venta flash
+-- con 2.000 sillas y tres eventos pequeños (uno ya agotado).
 
 -- Usuarios SOLO PARA PRUEBAS (demostración y Artillery). Todos tienen la contraseña de prueba
 -- "Taquilla2026!" (README, sección 6). El hash se calculó una sola vez con
@@ -16,28 +16,59 @@ SELECT 'Prueba ' || lpad(n::text, 3, '0'),
 FROM generate_series(1, 200) AS n
 ORDER BY n;
 
-INSERT INTO events (name, venue, starts_at) VALUES
-    ('Concierto Caña y Clave - Venta flash', 'Arena Cañaveralejo', '2026-12-27 20:00'),
-    ('Obra de teatro: El Cuentero del Pacífico', 'Teatro Municipal Enrique Buenaventura', '2026-12-05 19:30'),
-    ('Noche de jazz en el Jorge Isaacs', 'Teatro Jorge Isaacs', '2026-12-12 20:00');
+-- Cartelera: los eventos son inventados; los lugares son reales de Cali.
+INSERT INTO events (name, category, venue, starts_at, is_flash_sale) VALUES
+    ('Concierto Caña y Clave', 'Concierto', 'Teatro al Aire Libre Los Cristales', '2026-12-27 20:00', true),
+    ('Obra: El Cuentero del Pacífico', 'Teatro', 'Teatro Municipal Enrique Buenaventura', '2026-12-05 19:30', false),
+    ('Noche de jazz', 'Música', 'Teatro Jorge Isaacs', '2026-12-12 20:00', false),
+    ('Cuentos de medianoche', 'Narración oral', 'Teatrino del Teatro Municipal', '2026-12-19 21:00', false);
 
--- Concierto: 2 secciones x 20 filas (A a T) x 50 sillas = 2.000 sillas.
--- chr(64 + 1) es 'A', chr(64 + 2) es 'B', y así sucesivamente.
--- El ORDER BY hace que los id queden en orden: primero Preferencial, luego General.
+-- Concierto (venta flash): 4 zonas x 20 filas (A a T) x 25 sillas = 2.000 sillas (ids 1 a 2000).
+-- Orden de los ids: Platea 1-500, Gradería Central 501-1000, Gradería Izquierda 1001-1500,
+-- Gradería Derecha 1501-2000. chr(64 + 1) es 'A', chr(64 + 2) es 'B', y así sucesivamente.
 INSERT INTO seats (event_id, section, seat_row, seat_number)
-SELECT events.id, sections.name, chr(64 + row_index), seat_index
+SELECT events.id, zones.name, chr(64 + row_index), seat_index
 FROM events
-CROSS JOIN (VALUES (1, 'Preferencial'), (2, 'General')) AS sections (position, name)
+CROSS JOIN (VALUES
+    (1, 'Platea'),
+    (2, 'Gradería Central'),
+    (3, 'Gradería Izquierda'),
+    (4, 'Gradería Derecha')
+) AS zones (position, name)
 CROSS JOIN generate_series(1, 20) AS row_index
-CROSS JOIN generate_series(1, 50) AS seat_index
-WHERE events.name = 'Concierto Caña y Clave - Venta flash'
-ORDER BY sections.position, row_index, seat_index;
+CROSS JOIN generate_series(1, 25) AS seat_index
+WHERE events.name = 'Concierto Caña y Clave'
+ORDER BY zones.position, row_index, seat_index;
 
--- Eventos pequeños: 1 sección x 10 filas (A a J) x 10 sillas = 100 sillas cada uno.
+-- Teatro y jazz: una zona "Platea" de 10 filas (A a J) x 10 sillas = 100 sillas cada uno
+-- (ids 2001-2100 y 2101-2200).
 INSERT INTO seats (event_id, section, seat_row, seat_number)
 SELECT events.id, 'Platea', chr(64 + row_index), seat_index
 FROM events
 CROSS JOIN generate_series(1, 10) AS row_index
 CROSS JOIN generate_series(1, 10) AS seat_index
-WHERE events.name IN ('Obra de teatro: El Cuentero del Pacífico', 'Noche de jazz en el Jorge Isaacs')
+WHERE events.name IN ('Obra: El Cuentero del Pacífico', 'Noche de jazz')
 ORDER BY events.id, row_index, seat_index;
+
+-- Cuentos de medianoche: una zona "Platea" de 5 filas (A a E) x 8 sillas = 40 sillas (ids 2201-2240).
+INSERT INTO seats (event_id, section, seat_row, seat_number)
+SELECT events.id, 'Platea', chr(64 + row_index), seat_index
+FROM events
+CROSS JOIN generate_series(1, 5) AS row_index
+CROSS JOIN generate_series(1, 8) AS seat_index
+WHERE events.name = 'Cuentos de medianoche'
+ORDER BY row_index, seat_index;
+
+-- Cuentos de medianoche queda AGOTADO: el usuario demo tiene reservadas sus 40 sillas.
+INSERT INTO reservations (seat_id, user_id)
+SELECT seats.id, users.id
+FROM seats
+JOIN events ON events.id = seats.event_id
+CROSS JOIN users
+WHERE events.name = 'Cuentos de medianoche'
+  AND users.email = 'demo@taquilla.test'
+ORDER BY seats.id;
+
+UPDATE seats
+SET status = 'reserved'
+WHERE id IN (SELECT seat_id FROM reservations);
