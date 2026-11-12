@@ -39,6 +39,14 @@ services:
       INSTANCE_NAME: backend1
       PORT: 5000
       WEB_CONCURRENCY: ${BACKEND1_WORKERS:-2}
+      # Conexión a PostgreSQL con las variables estándar de libpq
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB:-boleteria}
+      PGUSER: ${POSTGRES_USER:-boleteria}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+    depends_on:
+      db:
+        condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend1"}]'
     networks:
@@ -59,6 +67,14 @@ services:
       INSTANCE_NAME: backend2
       PORT: 5000
       WEB_CONCURRENCY: ${BACKEND2_WORKERS:-2}
+      # Conexión a PostgreSQL con las variables estándar de libpq
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB:-boleteria}
+      PGUSER: ${POSTGRES_USER:-boleteria}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+    depends_on:
+      db:
+        condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend2"}]'
     networks:
@@ -79,6 +95,14 @@ services:
       INSTANCE_NAME: backend3
       PORT: 5000
       WEB_CONCURRENCY: ${BACKEND3_WORKERS:-2}
+      # Conexión a PostgreSQL con las variables estándar de libpq
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB:-boleteria}
+      PGUSER: ${POSTGRES_USER:-boleteria}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+    depends_on:
+      db:
+        condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend3"}]'
     networks:

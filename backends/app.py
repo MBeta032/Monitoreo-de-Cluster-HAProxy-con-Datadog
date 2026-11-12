@@ -3,6 +3,7 @@ import time
 import json
 import logging
 import sys
+import psycopg
 from flask import Flask, jsonify, request, Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -13,7 +14,11 @@ from prometheus_client import (
     multiprocess,
 )
 
+import db
+
 app = Flask(__name__)
+
+INSTANCE_NAME = os.getenv("INSTANCE_NAME", "backend-local")
 
 # Configuración de log estructurado en JSON hacia stdout
 class JsonFormatter(logging.Formatter):
@@ -126,6 +131,105 @@ def metrics():
     multiprocess.MultiProcessCollector(registry)
     return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
 
+# --- Boletería: API JSON ---
+
+def event_to_json(event):
+    return {
+        "id": event["id"],
+        "name": event["name"],
+        "venue": event["venue"],
+        "starts_at": event["starts_at"].isoformat(),
+        "available_seats": event["available_seats"],
+        "total_seats": event["total_seats"],
+    }
+
+def is_valid_email(email):
+    # Validación simple: sin espacios, un solo @, algo antes y un dominio con punto después
+    if len(email) > 254 or " " in email:
+        return False
+    if email.count("@") != 1:
+        return False
+    local_part, domain = email.split("@")
+    if local_part == "":
+        return False
+    if "." not in domain or domain.startswith(".") or domain.endswith("."):
+        return False
+    return True
+
+def validate_buyer(data):
+    # Devuelve el mensaje de error, o None si los datos del comprador están bien
+    if not isinstance(data, dict):
+        return "El cuerpo debe ser un JSON con buyer_name y buyer_email"
+
+    buyer_name = data.get("buyer_name")
+    if not isinstance(buyer_name, str) or buyer_name.strip() == "":
+        return "Falta el nombre del comprador (buyer_name)"
+    if len(buyer_name.strip()) > 100:
+        return "El nombre no puede tener más de 100 caracteres"
+
+    buyer_email = data.get("buyer_email")
+    if not isinstance(buyer_email, str) or buyer_email.strip() == "":
+        return "Falta el correo del comprador (buyer_email)"
+    if not is_valid_email(buyer_email.strip()):
+        return "El correo no es válido"
+
+    return None
+
+@app.route('/api/info')
+def api_info():
+    return jsonify({"instance": INSTANCE_NAME}), 200
+
+@app.route('/api/events')
+def api_list_events():
+    events = db.list_events()
+    return jsonify([event_to_json(event) for event in events]), 200
+
+@app.route('/api/events/<int:event_id>')
+def api_get_event(event_id):
+    event = db.get_event(event_id)
+    if event is None:
+        return jsonify({"error": "Not Found", "message": "El evento no existe"}), 404
+    return jsonify(event_to_json(event)), 200
+
+@app.route('/api/events/<int:event_id>/seats')
+def api_list_seats(event_id):
+    event = db.get_event(event_id)
+    if event is None:
+        return jsonify({"error": "Not Found", "message": "El evento no existe"}), 404
+    seats = db.list_seats(event_id)
+    return jsonify(seats), 200
+
+@app.route('/api/events/<int:event_id>/seats/<int:seat_id>/purchase', methods=['POST'])
+def api_purchase_seat(event_id, seat_id):
+    data = request.get_json(silent=True)
+    error_message = validate_buyer(data)
+    if error_message is not None:
+        return jsonify({"error": "Bad Request", "message": error_message}), 400
+
+    buyer_name = data["buyer_name"].strip()
+    buyer_email = data["buyer_email"].strip()
+    seat = db.purchase_seat(event_id, seat_id, buyer_name, buyer_email)
+    if seat is not None:
+        seat["sold_at"] = seat["sold_at"].isoformat()
+        return jsonify(seat), 201
+
+    # No se vendió: o la silla no existe en este evento, o alguien la compró antes
+    if db.seat_exists(event_id, seat_id):
+        return jsonify({"error": "Conflict", "message": "Esa silla ya fue vendida"}), 409
+    return jsonify({"error": "Not Found", "message": "La silla no existe en este evento"}), 404
+
+@app.errorhandler(psycopg.OperationalError)
+def database_unavailable(error):
+    # La base no responde: error de conexión, o se acabó la espera por una conexión del pool
+    # (PoolTimeout también es un OperationalError). Esta respuesta pasa por after_request,
+    # así que se cuenta en las métricas y deja una línea de log con level ERROR.
+    return jsonify({
+        "error": "Service Unavailable",
+        "message": "La base de datos no responde. Intenta de nuevo en unos minutos."
+    }), 503
+
 if __name__ == '__main__':
+    # Solo para pruebas manuales sin Gunicorn: abre el pool aquí
+    db.pool.open()
     port = int(os.getenv("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
