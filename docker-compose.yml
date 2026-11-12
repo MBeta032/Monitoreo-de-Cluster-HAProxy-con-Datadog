@@ -169,6 +169,7 @@ services:
       - haproxy-socket:/var/lib/haproxy:ro
       - ./datadog/datadog.yaml:/etc/datadog-agent/datadog.yaml:ro
       - ./datadog/conf.d/haproxy.d/conf.yaml:/etc/datadog-agent/conf.d/haproxy.d/conf.yaml:ro
+      - ./datadog/conf.d/http_check.d/conf.yaml:/etc/datadog-agent/conf.d/http_check.d/conf.yaml:ro
       - ./datadog/conf.d/openmetrics.d/conf.yaml:/etc/datadog-agent/conf.d/openmetrics.d/conf.yaml:ro
     networks:
       - cluster-net
