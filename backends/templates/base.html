@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Boletería Cali{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('index') }}">Boletería Cali</a>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Muestra qué backend atendió la página: al recargar se ve el balanceo de HAProxy -->
+  <footer class="site-footer">
+    Atendido por <strong>{{ instance_name }}</strong>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

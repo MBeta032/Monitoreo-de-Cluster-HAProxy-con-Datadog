@@ -18,6 +18,22 @@ CONCERT_SEAT_ID = 1
 OTHER_EVENT_SEAT_ID = 2001
 
 
+def test_index_page_shows_events(client, database):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.mimetype == "text/html"
+    assert "Concierto Caña y Clave - Venta flash" in response.get_data(as_text=True)
+
+
+def test_event_page_shows_seats(client, database):
+    response = client.get(f"/events/{CONCERT_ID}")
+
+    assert response.status_code == 200
+    assert f'data-seat-id="{CONCERT_SEAT_ID}"' in response.get_data(as_text=True)
+    assert client.get("/events/999").status_code == 404
+
+
 def test_events_list_has_seed_data(client, database):
     response = client.get("/api/events")
 

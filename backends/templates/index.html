@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Eventos en Cali</h1>
+<p class="intro">Elige un evento para ver las sillas y comprar la tuya.</p>
+
+<ul class="event-list">
+  {% for event in events %}
+  <li class="event-card">
+    <h2><a href="{{ url_for('event_page', event_id=event.id) }}">{{ event.name }}</a></h2>
+    <p>{{ event.venue }} · {{ event.starts_at.strftime("%d/%m/%Y %H:%M") }}</p>
+    <p class="seats-left">Quedan {{ event.available_seats }} de {{ event.total_seats }} sillas</p>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

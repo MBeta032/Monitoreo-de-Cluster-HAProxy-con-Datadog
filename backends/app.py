@@ -4,7 +4,7 @@ import json
 import logging
 import sys
 import psycopg
-from flask import Flask, jsonify, request, Response
+from flask import Flask, abort, jsonify, render_template, request, Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -103,14 +103,34 @@ def record_metrics_and_log(response):
 
     return response
 
+# --- Boletería: páginas web ---
+
+@app.context_processor
+def inject_instance_name():
+    # Todas las plantillas reciben el nombre de la instancia para mostrarlo en el pie de página
+    return {"instance_name": INSTANCE_NAME}
+
+def group_seats(seats):
+    # Agrupa las sillas por sección y por fila, en el mismo orden en que llegan de la base.
+    # Resultado: {"Preferencial": {"A": [silla, silla, ...], "B": [...]}, "General": {...}}
+    sections = {}
+    for seat in seats:
+        rows = sections.setdefault(seat["section"], {})
+        rows.setdefault(seat["seat_row"], []).append(seat)
+    return sections
+
 @app.route('/')
 def index():
-    instance_name = os.getenv("INSTANCE_NAME", "backend-local")
-    return jsonify({
-        "message": "Backend respondiendo correctamente",
-        "instance": instance_name,
-        "status": "success"
-    }), 200
+    events = db.list_events()
+    return render_template("index.html", events=events)
+
+@app.route('/events/<int:event_id>')
+def event_page(event_id):
+    event = db.get_event(event_id)
+    if event is None:
+        abort(404)
+    seats = db.list_seats(event_id)
+    return render_template("event.html", event=event, sections=group_seats(seats))
 
 @app.route('/health')
 def health():
@@ -223,10 +243,13 @@ def database_unavailable(error):
     # La base no responde: error de conexión, o se acabó la espera por una conexión del pool
     # (PoolTimeout también es un OperationalError). Esta respuesta pasa por after_request,
     # así que se cuenta en las métricas y deja una línea de log con level ERROR.
-    return jsonify({
-        "error": "Service Unavailable",
-        "message": "La base de datos no responde. Intenta de nuevo en unos minutos."
-    }), 503
+    # La API responde JSON; las páginas web responden una página HTML sencilla.
+    if request.path.startswith("/api/"):
+        return jsonify({
+            "error": "Service Unavailable",
+            "message": "La base de datos no responde. Intenta de nuevo en unos minutos."
+        }), 503
+    return render_template("503.html"), 503
 
 if __name__ == '__main__':
     # Solo para pruebas manuales sin Gunicorn: abre el pool aquí

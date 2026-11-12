@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.name }} - Boletería Cali{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('index') }}">← Volver a los eventos</a></p>
+<h1>{{ event.name }}</h1>
+<p>{{ event.venue }} · {{ event.starts_at.strftime("%d/%m/%Y %H:%M") }}</p>
+<p class="seats-left">Quedan <span id="available-count">{{ event.available_seats }}</span> de {{ event.total_seats }} sillas</p>
+
+<section class="purchase-panel">
+  <h2>Comprar</h2>
+  <p id="selected-seat">Elige una silla libre en el mapa.</p>
+  <form id="purchase-form" data-event-id="{{ event.id }}">
+    <label>Nombre
+      <input type="text" name="buyer_name" maxlength="100" required>
+    </label>
+    <label>Correo
+      <input type="email" name="buyer_email" maxlength="254" required>
+    </label>
+    <button type="submit">Comprar silla</button>
+  </form>
+  <p id="purchase-message" class="message" role="status"></p>
+</section>
+
+<p class="legend">
+  <span class="seat available">1</span> Libre
+  <span class="seat selected">1</span> Elegida
+  <span class="seat sold">1</span> Vendida
+</p>
+
+{% for section, rows in sections.items() %}
+<h2>{{ section }}</h2>
+<div class="seat-map">
+  {% for row, row_seats in rows.items() %}
+  <div class="seat-row">
+    <span class="row-label">{{ row }}</span>
+    {% for seat in row_seats %}
+    <button type="button"
+            class="seat {{ seat.status }}"
+            data-seat-id="{{ seat.id }}"
+            data-label="{{ section }}, fila {{ row }}, silla {{ seat.seat_number }}"
+            {% if seat.status == "sold" %}disabled{% endif %}>{{ seat.seat_number }}</button>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='purchase.js') }}"></script>
+{% endblock %}

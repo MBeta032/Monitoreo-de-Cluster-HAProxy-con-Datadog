@@ -84,6 +84,19 @@ def test_database_down_returns_503_and_logs_error(client, log_stream, unreachabl
     assert 'http_requests_total{handler="/api/events",method="GET",status="503"}' in metrics_text
 
 
+def test_index_page_with_database_down_returns_503_html(client, log_stream, unreachable_database):
+    response = client.get("/")
+
+    assert response.status_code == 503
+    assert response.mimetype == "text/html"
+    assert "Servicio no disponible" in response.get_data(as_text=True)
+
+    last_line = log_stream.getvalue().splitlines()[-1]
+    log_record = json.loads(last_line)
+    assert log_record["level"] == "ERROR"
+    assert log_record["status_code"] == 503
+
+
 def test_unhandled_exception_is_counted_and_logged_as_error(client, log_stream, monkeypatch):
     # Una ruta que lanza una excepción no manejada: Flask responde 500 y aun así
     # ejecuta after_request, así que la petición queda en el log y en las métricas.

@@ -31,7 +31,7 @@ services:
   # Límites por backend: 1 CPU y 384 MB (Compose v2 aplica deploy.resources sin Swarm).
   backend1:
     build: ./backends
-    image: haproxy-telematicos-backend:1.0.0
+    image: haproxy-telematicos-backend:2.0.0
     restart: unless-stopped
     container_name: backend1
     hostname: backend1
@@ -59,7 +59,7 @@ services:
 
   backend2:
     build: ./backends
-    image: haproxy-telematicos-backend:1.0.0
+    image: haproxy-telematicos-backend:2.0.0
     restart: unless-stopped
     container_name: backend2
     hostname: backend2
@@ -87,7 +87,7 @@ services:
 
   backend3:
     build: ./backends
-    image: haproxy-telematicos-backend:1.0.0
+    image: haproxy-telematicos-backend:2.0.0
     restart: unless-stopped
     container_name: backend3
     hostname: backend3
