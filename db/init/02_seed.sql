@@ -1,6 +1,21 @@
 -- Datos iniciales: un concierto de venta flash y dos eventos pequeños para tráfico normal.
 -- Los nombres de los eventos son inventados; los lugares son reales de Cali.
 
+-- Usuarios SOLO PARA PRUEBAS (demostración y Artillery). Todos tienen la contraseña de prueba
+-- "Taquilla2026!" (README, sección 6). El hash se calculó una sola vez con
+-- werkzeug.security.generate_password_hash("Taquilla2026!", method="pbkdf2:sha256:600000").
+INSERT INTO users (name, email, password_hash) VALUES
+    ('Usuario Demo', 'demo@taquilla.test',
+     'pbkdf2:sha256:600000$lYDBq9gXmEKaw5Lm$c674e8e547cfa6dacd07a313af94818c56e106f33a2599fe0f886b8fa56ae6bc');
+
+-- 200 usuarios: prueba001@taquilla.test a prueba200@taquilla.test, con el mismo hash
+INSERT INTO users (name, email, password_hash)
+SELECT 'Prueba ' || lpad(n::text, 3, '0'),
+       'prueba' || lpad(n::text, 3, '0') || '@taquilla.test',
+       'pbkdf2:sha256:600000$lYDBq9gXmEKaw5Lm$c674e8e547cfa6dacd07a313af94818c56e106f33a2599fe0f886b8fa56ae6bc'
+FROM generate_series(1, 200) AS n
+ORDER BY n;
+
 INSERT INTO events (name, venue, starts_at) VALUES
     ('Concierto Caña y Clave - Venta flash', 'Arena Cañaveralejo', '2026-12-27 20:00'),
     ('Obra de teatro: El Cuentero del Pacífico', 'Teatro Municipal Enrique Buenaventura', '2026-12-05 19:30'),

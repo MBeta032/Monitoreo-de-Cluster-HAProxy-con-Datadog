@@ -9,6 +9,17 @@
 <body class="{% block body_class %}{% endblock %}">
   <header class="site-header">
     <a class="brand" href="{{ url_for('index') }}">Boletería Cali</a>
+    <div class="user-nav">
+      {% if current_user %}
+      <span>{{ current_user.name }}</span>
+      <form method="post" action="{{ url_for('logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link-button">Cerrar sesión</button>
+      </form>
+      {% else %}
+      <a href="{{ url_for('login') }}">Iniciar sesión</a>
+      {% endif %}
+    </div>
   </header>
 
   {# Barra de pasos: cada página define current_step (1 Eventos, 2 Sillas, 3 Confirmación) #}

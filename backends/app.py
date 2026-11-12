@@ -3,8 +3,9 @@ import time
 import json
 import logging
 import sys
+from datetime import timedelta
 import psycopg
-from flask import Flask, abort, jsonify, render_template, request, Response
+from flask import Flask, abort, g, jsonify, redirect, render_template, request, Response, session, url_for
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -14,11 +15,25 @@ from prometheus_client import (
     multiprocess,
 )
 
+import auth
 import db
 
 app = Flask(__name__)
 
 INSTANCE_NAME = os.getenv("INSTANCE_NAME", "backend-local")
+
+# Sesión con la cookie firmada de Flask: la sesión no vive en la memoria de un backend.
+# SECRET_KEY firma la cookie y debe ser la MISMA en los 3 backends; así cualquiera de ellos
+# reconoce la sesión que creó otro (README, sección 6).
+secret_key = os.getenv("SECRET_KEY")
+if not secret_key:
+    raise RuntimeError("Falta la variable SECRET_KEY (ver .env.example)")
+app.config["SECRET_KEY"] = secret_key
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# False porque el laboratorio va por HTTP. En producción, con HTTPS, va en True.
+app.config["SESSION_COOKIE_SECURE"] = False
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=2)
 
 # Configuración de log estructurado en JSON hacia stdout
 class JsonFormatter(logging.Formatter):
@@ -106,9 +121,14 @@ def record_metrics_and_log(response):
 # --- Boletería: páginas web ---
 
 @app.context_processor
-def inject_instance_name():
-    # Todas las plantillas reciben el nombre de la instancia para mostrarlo en el pie de página
-    return {"instance_name": INSTANCE_NAME}
+def inject_common_values():
+    # Todas las plantillas reciben: el nombre de la instancia (pie de página), el usuario de la
+    # sesión (encabezado) y la función csrf_token() para los formularios POST.
+    return {
+        "instance_name": INSTANCE_NAME,
+        "current_user": auth.get_current_user(),
+        "csrf_token": auth.get_csrf_token,
+    }
 
 def group_seats(seats):
     # Agrupa las sillas por sección y por fila, en el mismo orden en que llegan de la base.
@@ -131,6 +151,84 @@ def event_page(event_id):
         abort(404)
     seats = db.list_seats(event_id)
     return render_template("event.html", event=event, sections=group_seats(seats))
+
+# --- Cuentas: iniciar sesión, crear cuenta y cerrar sesión ---
+
+def get_next_url():
+    # Página a la que se vuelve después de iniciar sesión. Solo se aceptan rutas internas.
+    next_url = request.values.get("next", "")
+    if auth.is_safe_next(next_url):
+        return next_url
+    return url_for("index")
+
+def validate_registration(name, email, password):
+    # Devuelve el mensaje de error, o None si los datos de la cuenta nueva están bien
+    if name == "":
+        return "Escribe tu nombre."
+    if len(name) > 100:
+        return "El nombre no puede tener más de 100 caracteres."
+    if not is_valid_email(email):
+        return "El correo no es válido."
+    if len(password) < auth.MIN_PASSWORD_LENGTH:
+        return f"La contraseña debe tener al menos {auth.MIN_PASSWORD_LENGTH} caracteres."
+    return None
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    next_url = get_next_url()
+    if request.method == 'GET':
+        return render_template("auth.html", mode="login", next_url=next_url)
+
+    if not auth.csrf_token_is_valid(request.form.get("csrf_token")):
+        abort(403)
+
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+    user = db.get_user_by_email(email)
+    if user is None or not auth.password_matches(user["password_hash"], password):
+        return render_template(
+            "auth.html", mode="login", next_url=next_url, email=email,
+            error_message="Correo o contraseña incorrectos.",
+        ), 401
+
+    auth.start_session(user["id"])
+    return redirect(next_url)
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    next_url = get_next_url()
+    if request.method == 'GET':
+        return render_template("auth.html", mode="register", next_url=next_url)
+
+    if not auth.csrf_token_is_valid(request.form.get("csrf_token")):
+        abort(403)
+
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+    error_message = validate_registration(name, email, password)
+    if error_message is not None:
+        return render_template(
+            "auth.html", mode="register", next_url=next_url, name=name, email=email,
+            error_message=error_message,
+        ), 400
+
+    user_id = db.create_user(name, email, auth.hash_password(password))
+    if user_id is None:
+        return render_template(
+            "auth.html", mode="register", next_url=next_url, name=name, email=email,
+            error_message="Ya existe una cuenta con ese correo. Inicia sesión.",
+        ), 409
+
+    auth.start_session(user_id)
+    return redirect(next_url)
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    if not auth.csrf_token_is_valid(request.form.get("csrf_token")):
+        abort(403)
+    session.clear()
+    return redirect(url_for("index"))
 
 @app.route('/health')
 def health():
@@ -199,6 +297,32 @@ def validate_buyer(data):
 def api_info():
     return jsonify({"instance": INSTANCE_NAME}), 200
 
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    # No lleva token CSRF: el cuerpo es JSON y un formulario de otro sitio no puede enviar JSON.
+    # Responde el token que el cliente debe enviar en X-CSRF-Token en los demás POST de la API.
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("email"), str) or not isinstance(data.get("password"), str):
+        return jsonify({"error": "Bad Request", "message": "Envía un JSON con email y password"}), 400
+
+    email = data["email"].strip().lower()
+    user = db.get_user_by_email(email)
+    if user is None or not auth.password_matches(user["password_hash"], data["password"]):
+        return jsonify({"error": "Unauthorized", "message": "Correo o contraseña incorrectos"}), 401
+
+    auth.start_session(user["id"])
+    return jsonify({
+        "user": {"id": user["id"], "name": user["name"], "email": user["email"]},
+        "csrf_token": session["csrf_token"],
+    }), 200
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    if not auth.csrf_token_is_valid(request.headers.get("X-CSRF-Token")):
+        return jsonify({"error": "Forbidden", "message": "Token CSRF inválido o ausente"}), 403
+    session.clear()
+    return jsonify({"message": "Sesión cerrada"}), 200
+
 @app.route('/api/events')
 def api_list_events():
     events = db.list_events()
@@ -249,6 +373,8 @@ def database_unavailable(error):
             "error": "Service Unavailable",
             "message": "La base de datos no responde. Intenta de nuevo en unos minutos."
         }), 503
+    # El encabezado no consulta al usuario: la base está caída
+    g.user = None
     return render_template("503.html"), 503
 
 if __name__ == '__main__':

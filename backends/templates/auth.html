@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == "login" %}Iniciar sesión{% else %}Crear cuenta{% endif %} - Boletería Cali{% endblock %}
+
+{% block content %}
+<div class="auth-box card">
+  {# Pestañas: son dos rutas distintas (/login y /register) que conservan el parámetro next #}
+  <nav class="auth-tabs">
+    <a href="{{ url_for('login', next=next_url) }}" class="{% if mode == 'login' %}active{% endif %}">Iniciar sesión</a>
+    <a href="{{ url_for('register', next=next_url) }}" class="{% if mode == 'register' %}active{% endif %}">Crear cuenta</a>
+  </nav>
+
+  {% if error_message %}
+  <p class="message error" role="alert">{{ error_message }}</p>
+  {% endif %}
+
+  {% if mode == "login" %}
+  <form method="post" action="{{ url_for('login') }}" class="auth-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <label>Correo
+      <input type="email" name="email" value="{{ email or '' }}" maxlength="254" required autocomplete="email">
+    </label>
+    <label>Contraseña
+      <input type="password" name="password" required autocomplete="current-password">
+    </label>
+    <button type="submit" class="button-primary">Iniciar sesión y continuar</button>
+  </form>
+  {% else %}
+  <form method="post" action="{{ url_for('register') }}" class="auth-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+    <label>Nombre
+      <input type="text" name="name" value="{{ name or '' }}" maxlength="100" required autocomplete="name">
+    </label>
+    <label>Correo
+      <input type="email" name="email" value="{{ email or '' }}" maxlength="254" required autocomplete="email">
+    </label>
+    <label>Contraseña (mínimo 8 caracteres)
+      <input type="password" name="password" minlength="8" required autocomplete="new-password">
+    </label>
+    <button type="submit" class="button-primary">Crear cuenta y continuar</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

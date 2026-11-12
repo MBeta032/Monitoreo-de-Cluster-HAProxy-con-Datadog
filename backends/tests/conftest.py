@@ -10,6 +10,9 @@ from psycopg_pool import ConnectionPool
 # por eso se define aquí, antes de importar la app.
 os.environ["PROMETHEUS_MULTIPROC_DIR"] = tempfile.mkdtemp(prefix="prometheus_multiproc_")
 
+# La app exige SECRET_KEY al importarse. En pruebas (local y CI) se usa una clave de prueba.
+os.environ.setdefault("SECRET_KEY", "clave-solo-para-pruebas")
+
 import app as backend_app  # noqa: E402
 import db  # noqa: E402
 
@@ -21,9 +24,20 @@ TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 DB_INIT_DIR = Path(__file__).resolve().parents[2] / "db" / "init"
 
 
+# Contraseña de los usuarios de prueba del seed (prueba001@taquilla.test, ...)
+TEST_PASSWORD = "Taquilla2026!"
+
+
 @pytest.fixture
 def client():
     return backend_app.app.test_client()
+
+
+def csrf_token_for(test_client):
+    # Pide la página de inicio de sesión (que crea el token) y lo lee de la sesión del cliente
+    test_client.get("/login")
+    with test_client.session_transaction() as test_session:
+        return test_session["csrf_token"]
 
 
 @pytest.fixture
@@ -68,7 +82,7 @@ def database(test_pool, monkeypatch):
     schema_sql = (DB_INIT_DIR / "01_schema.sql").read_text(encoding="utf-8")
     seed_sql = (DB_INIT_DIR / "02_seed.sql").read_text(encoding="utf-8")
     with test_pool.connection() as conn:
-        conn.execute("DROP TABLE IF EXISTS seats, events")
+        conn.execute("DROP TABLE IF EXISTS seats, events, users")
         # Sin parámetros, psycopg permite varias sentencias en un mismo execute
         conn.execute(schema_sql)
         conn.execute(seed_sql)

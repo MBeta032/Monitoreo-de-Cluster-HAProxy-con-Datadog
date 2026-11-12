@@ -44,6 +44,8 @@ services:
       PGDATABASE: ${POSTGRES_DB:-boleteria}
       PGUSER: ${POSTGRES_USER:-boleteria}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+      # Firma la cookie de sesión: la MISMA en los 3 backends para que todos reconozcan la sesión
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en el archivo .env (ver .env.example)}
     depends_on:
       db:
         condition: service_healthy
@@ -72,6 +74,8 @@ services:
       PGDATABASE: ${POSTGRES_DB:-boleteria}
       PGUSER: ${POSTGRES_USER:-boleteria}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+      # Firma la cookie de sesión: la MISMA en los 3 backends para que todos reconozcan la sesión
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en el archivo .env (ver .env.example)}
     depends_on:
       db:
         condition: service_healthy
@@ -100,6 +104,8 @@ services:
       PGDATABASE: ${POSTGRES_DB:-boleteria}
       PGUSER: ${POSTGRES_USER:-boleteria}
       PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+      # Firma la cookie de sesión: la MISMA en los 3 backends para que todos reconozcan la sesión
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en el archivo .env (ver .env.example)}
     depends_on:
       db:
         condition: service_healthy

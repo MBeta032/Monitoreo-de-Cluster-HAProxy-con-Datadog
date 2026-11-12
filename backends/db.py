@@ -24,6 +24,48 @@ pool = ConnectionPool(
 )
 
 
+def create_user(name, email, password_hash):
+    # Devuelve el id del usuario nuevo, o None si ya existe una cuenta con ese correo.
+    # ON CONFLICT evita el error aunque dos personas se registren con el mismo correo al tiempo.
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO users (name, email, password_hash)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (email) DO NOTHING
+                RETURNING id
+                """,
+                (name, email, password_hash),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return None
+            return row[0]
+
+
+def get_user_by_email(email):
+    # Incluye el hash de la contraseña: solo se usa para iniciar sesión
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT id, name, email, password_hash FROM users WHERE email = %s",
+                (email,),
+            )
+            return cur.fetchone()
+
+
+def get_user(user_id):
+    # Datos públicos del usuario de la sesión (sin el hash)
+    with pool.connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT id, name, email FROM users WHERE id = %s",
+                (user_id,),
+            )
+            return cur.fetchone()
+
+
 def list_events():
     # Eventos con el total de sillas y cuántas quedan libres
     with pool.connection() as conn:

@@ -1,5 +1,8 @@
 import json
 
+import pytest
+
+import auth
 import db
 
 
@@ -116,3 +119,36 @@ def test_unhandled_exception_is_counted_and_logged_as_error(client, log_stream, 
 
     metrics_text = client.get("/metrics").get_data(as_text=True)
     assert 'http_requests_total{handler="/api/events",method="GET",status="500"}' in metrics_text
+
+
+# Sesiones y CSRF: estas no necesitan base de datos (el token se revisa antes de consultarla)
+
+def test_post_login_without_csrf_token_returns_403(client):
+    response = client.post("/login", data={"email": "prueba001@taquilla.test", "password": "x"})
+
+    assert response.status_code == 403
+
+
+def test_api_logout_without_csrf_header_returns_403(client):
+    response = client.post("/api/logout")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("url", ["/events/1", "/events/1?section=Platea", "/"])
+def test_internal_next_is_accepted(url):
+    assert auth.is_safe_next(url)
+
+
+@pytest.mark.parametrize("url", [
+    "https://otro.sitio",
+    "//otro.sitio",
+    "/\\otro.sitio",
+    "/\t/otro.sitio",
+    "/\n/otro.sitio",
+    "/\r/otro.sitio",
+    "javascript:alert(1)",
+    "",
+])
+def test_external_next_is_rejected(url):
+    assert not auth.is_safe_next(url)

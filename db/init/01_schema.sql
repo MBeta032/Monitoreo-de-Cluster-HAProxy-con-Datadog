@@ -1,6 +1,19 @@
 -- Esquema de la boletería.
 -- La imagen oficial de PostgreSQL ejecuta este archivo una sola vez, cuando el volumen pg-data está vacío.
 
+-- Usuarios de la taquilla. El correo se guarda en minúsculas para que sea único sin importar mayúsculas.
+-- password_hash guarda el hash de werkzeug.security, nunca la contraseña.
+CREATE TABLE users (
+    id            integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name          varchar(100) NOT NULL,
+    email         varchar(254) NOT NULL,
+    password_hash varchar(255) NOT NULL,
+    created_at    timestamptz  NOT NULL DEFAULT now(),
+
+    CONSTRAINT users_email_unique UNIQUE (email),
+    CONSTRAINT users_email_lowercase CHECK (email = lower(email))
+);
+
 -- Eventos a la venta. starts_at es la hora local de Cali (sin zona horaria).
 CREATE TABLE events (
     id        integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
