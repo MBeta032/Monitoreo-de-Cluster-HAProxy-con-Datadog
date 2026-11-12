@@ -1,0 +1,38 @@
+# CI de los backends: corre las pruebas y construye la imagen en cada Pull Request
+name: backends-ci
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - "backends/**"
+      - ".github/workflows/backends-ci.yml"
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backends
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v7
+
+      - name: Instalar Python 3.14
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Correr las pruebas
+        run: python -m pytest -v
+
+      - name: Construir la imagen
+        run: docker build -t haproxy-telematicos-backend:1.0.0 .

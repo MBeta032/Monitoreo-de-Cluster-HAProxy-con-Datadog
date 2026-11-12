@@ -27,43 +27,67 @@ services:
       - cluster-net 
   
   # --- backends (Esteban) ---
-  # TEMPORALES: imagen traefik/whoami, solo para probar HAProxy mientras llegan los reales.
-  # Esteban cambia "image" por sus backends. No cambiar nombres, hostname ni el puerto 5000.
+  # Los tres usan la misma imagen. No cambiar nombres, hostname ni el puerto 5000.
+  # Límites por backend: 1 CPU y 384 MB (Compose v2 aplica deploy.resources sin Swarm).
   backend1:
     build: ./backends
+    image: haproxy-telematicos-backend:1.0.0
+    restart: unless-stopped
     container_name: backend1
     hostname: backend1
     environment:
       INSTANCE_NAME: backend1
       PORT: 5000
+      WEB_CONCURRENCY: ${BACKEND1_WORKERS:-2}
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend1"}]'
     networks:
       - cluster-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 384M
 
   backend2:
     build: ./backends
+    image: haproxy-telematicos-backend:1.0.0
+    restart: unless-stopped
     container_name: backend2
     hostname: backend2
     environment:
       INSTANCE_NAME: backend2
       PORT: 5000
+      WEB_CONCURRENCY: ${BACKEND2_WORKERS:-2}
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend2"}]'
     networks:
       - cluster-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 384M
 
   backend3:
     build: ./backends
+    image: haproxy-telematicos-backend:1.0.0
+    restart: unless-stopped
     container_name: backend3
     hostname: backend3
     environment:
       INSTANCE_NAME: backend3
       PORT: 5000
+      WEB_CONCURRENCY: ${BACKEND3_WORKERS:-2}
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend3"}]'
     networks:
       - cluster-net
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 384M
 
   # --- datadog-agent (Jhon) ---
   datadog-agent:

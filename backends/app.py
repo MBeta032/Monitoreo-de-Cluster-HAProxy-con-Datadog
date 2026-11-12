@@ -4,7 +4,14 @@ import json
 import logging
 import sys
 from flask import Flask, jsonify, request, Response
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
 
 app = Flask(__name__)
 
@@ -57,9 +64,17 @@ def record_metrics_and_log(response):
     # Excluir /health y /metrics de contadores, latencias y logs
     if path not in EXCLUDED_PATHS:
         duration = time.time() - getattr(request, '_start_time', time.time())
-        
-        HTTP_REQUESTS_TOTAL.labels(method=method, handler=path, status=status_code).inc()
-        HTTP_REQUEST_DURATION_SECONDS.labels(method=method, handler=path).observe(duration)
+
+        # El label handler usa la ruta plantilla de Flask (por ejemplo /api/events/<int:event_id>)
+        # y no la ruta escrita por el usuario, para no crear una serie por cada URL distinta.
+        # Si ninguna ruta coincide (404 o 405), se usa un valor fijo.
+        if request.url_rule is not None:
+            handler_label = request.url_rule.rule
+        else:
+            handler_label = "unmatched"
+
+        HTTP_REQUESTS_TOTAL.labels(method=method, handler=handler_label, status=status_code).inc()
+        HTTP_REQUEST_DURATION_SECONDS.labels(method=method, handler=handler_label).observe(duration)
         
         # Log de aplicacion estructurado en JSON
         log_payload = {
@@ -71,7 +86,15 @@ def record_metrics_and_log(response):
                 "client_ip": request.remote_addr
             }
         }
-        logger.info(f"Peticion procesada {method} {path} - {status_code}", extra=log_payload)
+        message = f"Peticion procesada {method} {path} - {status_code}"
+
+        # Nivel del log segun el resultado: 5xx es ERROR, 4xx es WARNING y el resto INFO
+        if response.status_code >= 500:
+            logger.error(message, extra=log_payload)
+        elif response.status_code >= 400:
+            logger.warning(message, extra=log_payload)
+        else:
+            logger.info(message, extra=log_payload)
 
     return response
 
@@ -97,7 +120,11 @@ def trigger_error():
 
 @app.route('/metrics')
 def metrics():
-    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+    # Modo multiproceso: suma las métricas de todos los workers de Gunicorn,
+    # leyendo los archivos de PROMETHEUS_MULTIPROC_DIR (documentación de prometheus-client)
+    registry = CollectorRegistry()
+    multiprocess.MultiProcessCollector(registry)
+    return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
 
 if __name__ == '__main__':
     port = int(os.getenv("PORT", 5000))
