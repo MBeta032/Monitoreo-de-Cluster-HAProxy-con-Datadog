@@ -803,9 +803,10 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 <details>
 <summary>OpenMetrics no aparece en Datadog Agent</summary>
 
-- **Causa:** durante las pruebas, el Agent reconocía los contenedores Docker, pero no cargaba la integración OpenMetrics mediante etiquetas de Autodiscovery.
-- **Solución:** se configuraron los tres backends directamente en `datadog/conf.d/openmetrics.d/conf.yaml` y se montó el archivo en el contenedor del Agent. Después se comprobó con `agent status` que las tres instancias estaban en estado OK.
-- <sub>Agregado por: Jhon</sub>
+- **Causa probable (no confirmada):** el formato del JSON en las etiquetas de Autodiscovery. El intento no quedó en el historial de Git; los logs por etiquetas sí funcionaban.
+- **Solución temporal:** se usó un archivo montado, `datadog/conf.d/openmetrics.d/conf.yaml`.
+- **Solución actual:** funciona por etiquetas `com.datadoghq.ad.checks` en los backends, con el JSON entre comillas simples, y el archivo se quitó ([ver 7.4](#74-métricas-de-los-backends-openmetrics-por-autodiscovery)). Se comprueba con `agent configcheck -v`.
+- <sub>Agregado por: Jhon · actualizado por: Manuel</sub>
 
 </details>
 
@@ -832,6 +833,7 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 
 - **Causa probable:** los mensajes de arranque de HAProxy y Gunicorn se escriben en `stderr`, que Datadog puede clasificar como Error.
 - **Solución:** se comprobó que eran mensajes informativos y no errores HTTP. Para consultar fallos reales se recomienda utilizar el atributo `status_code` de los logs JSON.
+- **Resuelto en la fase 1:** Gunicorn y la app escriben JSON por `stdout` con su nivel real ([ver 7.5](#75-recolección-de-logs)).
 - <sub>Agregado por: Jhon</sub>
 
 </details>
@@ -841,6 +843,7 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 
 - **Causa probable:** Gunicorn utiliza dos workers que mantienen sus contadores de Prometheus de forma independiente.
 - **Solución pendiente:** se propuso al responsable de los backends utilizar un worker con cuatro threads o configurar Prometheus en modo multiproceso. El Agent ya recopila métricas de los tres servidores, pero falta validar su exactitud después de este ajuste.
+- **Resuelto en la fase 1:** prometheus-client en modo multiproceso; `/metrics` suma los contadores de todos los workers ([ver 6.5](#65-métricas-y-logs)).
 - <sub>Agregado por: Jhon</sub>
 
 </details>
