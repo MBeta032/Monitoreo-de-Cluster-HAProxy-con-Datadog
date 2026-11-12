@@ -71,7 +71,15 @@ def record_metrics_and_log(response):
                 "client_ip": request.remote_addr
             }
         }
-        logger.info(f"Peticion procesada {method} {path} - {status_code}", extra=log_payload)
+        message = f"Peticion procesada {method} {path} - {status_code}"
+
+        # Nivel del log segun el resultado: 5xx es ERROR, 4xx es WARNING y el resto INFO
+        if response.status_code >= 500:
+            logger.error(message, extra=log_payload)
+        elif response.status_code >= 400:
+            logger.warning(message, extra=log_payload)
+        else:
+            logger.info(message, extra=log_payload)
 
     return response
 
