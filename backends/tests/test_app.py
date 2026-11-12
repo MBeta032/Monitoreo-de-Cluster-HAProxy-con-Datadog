@@ -74,6 +74,17 @@ def test_confirm_page_without_session_redirects_to_login_with_next(client):
     assert "next=/events/1/confirm?seat%3D5" in location
 
 
+def test_confirm_post_without_session_redirects_to_login_with_seat(client):
+    # La sesión venció mientras la página Confirmar estaba abierta: sin sesión tampoco hay
+    # token CSRF, así que se espera la redirección a /login (no un 403) y que next lleve la silla.
+    response = client.post("/events/1/confirm", data={"seat_id": 5, "csrf_token": "token-viejo"})
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert location.startswith("/login?")
+    assert "next=/events/1/confirm?seat%3D5" in location
+
+
 def test_database_down_returns_503_and_logs_error(client, log_stream, unreachable_database):
     response = client.get("/api/events")
 

@@ -12,7 +12,8 @@ pytestmark = pytest.mark.skipif(
 # Ids fijos del seed (db/init/02_seed.sql):
 # - Concierto (evento 1): Platea 1-500, Gradería Central 501-1000, Izquierda 1001-1500, Derecha 1501-2000.
 # - Obra de teatro (evento 2): una sola zona, sillas 2001-2100.
-# - Cuentos de medianoche (evento 4): una sola zona, 40 sillas, todas reservadas.
+# - Cuentos de medianoche (evento 4): una sola zona, 40 sillas, todas reservadas
+#   (una por usuario, de prueba161 a prueba200).
 CONCERT_ID = 1
 THEATER_ID = 2
 SOLD_OUT_EVENT_ID = 4

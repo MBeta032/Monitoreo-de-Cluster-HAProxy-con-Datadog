@@ -200,15 +200,20 @@ def confirm_page(event_id):
     return render_template("confirm.html", seat=seat, seat_taken=seat_taken)
 
 @app.route('/events/<int:event_id>/confirm', methods=['POST'])
-@auth.login_required
 def confirm_reservation(event_id):
+    seat_id = request.form.get("seat_id", type=int)
+    # La sesión se revisa ANTES que el token CSRF: si la sesión venció, el token tampoco existe.
+    # Sin sesión se vuelve a la página Confirmar con la silla (como en el GET), no al POST.
+    user = auth.get_current_user()
+    if user is None:
+        confirm_url = url_for("confirm_page", event_id=event_id, seat=seat_id)
+        return redirect(url_for("login", next=confirm_url, seat=seat_id))
+
     if not auth.csrf_token_is_valid(request.form.get("csrf_token")):
         abort(403)
-    seat_id = request.form.get("seat_id", type=int)
     if seat_id is None:
         abort(404)
 
-    user = auth.get_current_user()
     reservation = db.reserve_seat(event_id, seat_id, user["id"])
     if reservation is not None:
         # Patrón POST/Redirect/GET: recargar la página Listo no repite la reserva

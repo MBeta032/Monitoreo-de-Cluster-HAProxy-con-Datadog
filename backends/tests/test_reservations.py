@@ -13,7 +13,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 # Ids fijos del seed: el concierto es el evento 1 (sillas 1 a 2000) y la silla 2001 es del evento 2.
-# La silla 2201 es de Cuentos de medianoche (evento 4) y ya está reservada por el usuario demo.
+# La silla 2201 es de Cuentos de medianoche (evento 4) y ya está reservada por prueba161.
 CONCERT_ID = 1
 OTHER_EVENT_SEAT_ID = 2001
 SOLD_OUT_EVENT_ID = 4

@@ -66,7 +66,6 @@ def get_user(user_id):
             return cur.fetchone()
 
 
-
 def list_events():
     # Eventos de la cartelera con el total de sillas y cuántas quedan libres
     with pool.connection() as conn:

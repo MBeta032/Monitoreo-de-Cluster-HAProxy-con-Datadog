@@ -59,15 +59,20 @@ CROSS JOIN generate_series(1, 8) AS seat_index
 WHERE events.name = 'Cuentos de medianoche'
 ORDER BY row_index, seat_index;
 
--- Cuentos de medianoche queda AGOTADO: el usuario demo tiene reservadas sus 40 sillas.
+-- Cuentos de medianoche queda AGOTADO: sus 40 sillas se reparten una por usuario, en orden,
+-- entre prueba161 y prueba200 (silla 2201 -> prueba161, ..., silla 2240 -> prueba200).
+-- Así ningún usuario queda con 40 reservas, y demo@taquilla.test empieza sin reservas.
 INSERT INTO reservations (seat_id, user_id)
-SELECT seats.id, users.id
-FROM seats
-JOIN events ON events.id = seats.event_id
-CROSS JOIN users
-WHERE events.name = 'Cuentos de medianoche'
-  AND users.email = 'demo@taquilla.test'
-ORDER BY seats.id;
+SELECT numbered_seats.id, users.id
+FROM (
+    SELECT seats.id, row_number() OVER (ORDER BY seats.id) AS position
+    FROM seats
+    JOIN events ON events.id = seats.event_id
+    WHERE events.name = 'Cuentos de medianoche'
+) AS numbered_seats
+JOIN users
+  ON users.email = 'prueba' || lpad((160 + numbered_seats.position)::text, 3, '0') || '@taquilla.test'
+ORDER BY numbered_seats.id;
 
 UPDATE seats
 SET status = 'reserved'
