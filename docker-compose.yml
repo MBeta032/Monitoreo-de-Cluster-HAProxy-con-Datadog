@@ -149,6 +149,8 @@ services:
   # --- datadog-agent (Jhon) ---
   datadog-agent:
     image: registry.datadoghq.com/agent:7.85.1
+    # Se vuelve a levantar solo si se cae o si Docker se reinicia (igual que los backends)
+    restart: unless-stopped
     container_name: datadog-agent
     dns:
       - 8.8.8.8
