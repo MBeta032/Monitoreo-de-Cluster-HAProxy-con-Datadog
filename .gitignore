@@ -9,3 +9,7 @@ desktop.ini
 .DS_Store
 .vscode/
 *.log
+
+# Cachés que crean Python y pytest al correr las pruebas
+__pycache__/
+.pytest_cache/

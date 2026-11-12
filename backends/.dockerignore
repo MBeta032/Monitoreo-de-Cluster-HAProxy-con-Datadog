@@ -1,0 +1,5 @@
+# Archivos que no se copian a la imagen (solo sirven para desarrollo y pruebas)
+tests/
+requirements-dev.txt
+__pycache__/
+.pytest_cache/
