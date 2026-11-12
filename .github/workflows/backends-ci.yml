@@ -8,6 +8,7 @@ on:
       - main
     paths:
       - "backends/**"
+      - "db/**"
       - ".github/workflows/backends-ci.yml"
 
 jobs:
@@ -16,6 +17,23 @@ jobs:
     defaults:
       run:
         working-directory: backends
+
+    # PostgreSQL temporal para las pruebas con base de datos (misma versión que docker-compose.yml).
+    # Usa "trust" para no guardar ninguna contraseña en el repo: el contenedor se borra al terminar el job.
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: boleteria_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        # Las pruebas empiezan cuando PostgreSQL responde por TCP
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d boleteria_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
 
     steps:
       - name: Descargar el código
@@ -32,6 +50,8 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Correr las pruebas
+        env:
+          TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/boleteria_test
         run: python -m pytest -v
 
       - name: Construir la imagen
