@@ -1,51 +1,88 @@
 {% extends "base.html" %}
+{% set current_step = 2 %}
 
 {% block title %}{{ event.name }} - Boletería Cali{% endblock %}
+{% block body_class %}has-buy-bar{% endblock %}
 
 {% block content %}
-<p><a href="{{ url_for('index') }}">← Volver a los eventos</a></p>
-<h1>{{ event.name }}</h1>
-<p>{{ event.venue }} · {{ event.starts_at.strftime("%d/%m/%Y %H:%M") }}</p>
-<p class="seats-left">Quedan <span id="available-count">{{ event.available_seats }}</span> de {{ event.total_seats }} sillas</p>
+<div class="event-layout">
 
-<section class="purchase-panel">
-  <h2>Comprar</h2>
-  <p id="selected-seat">Elige una silla libre en el mapa.</p>
-  <form id="purchase-form" data-event-id="{{ event.id }}">
-    <label>Nombre
-      <input type="text" name="buyer_name" maxlength="100" required>
-    </label>
-    <label>Correo
-      <input type="email" name="buyer_email" maxlength="254" required>
-    </label>
-    <button type="submit">Comprar silla</button>
-  </form>
-  <p id="purchase-message" class="message" role="status"></p>
-</section>
+  <!-- Columna izquierda: evento, selección y datos del comprador -->
+  <aside class="event-sidebar">
+    <section class="card">
+      <div class="cover cover-{{ event.id % 3 }}">
+        <span class="cover-name">{{ event.name }}</span>
+        {% if event.available_seats == 0 %}<span class="badge-sold-out">AGOTADO</span>{% endif %}
+      </div>
+      <h1 class="event-title">{{ event.name }}</h1>
+      <p class="event-detail">{{ event.venue }}</p>
+      <p class="event-detail">{{ event.starts_at.strftime("%d/%m/%Y") }} · {{ event.starts_at.strftime("%H:%M") }} h</p>
+      <p class="seats-left">Quedan <span id="available-count">{{ event.available_seats }}</span> de {{ event.total_seats }} sillas</p>
+    </section>
 
-<p class="legend">
-  <span class="seat available">1</span> Libre
-  <span class="seat selected">1</span> Elegida
-  <span class="seat sold">1</span> Vendida
-</p>
+    <section class="card">
+      <h2 class="card-title">TU SELECCIÓN</h2>
+      <dl class="selection">
+        <div><dt>Sección</dt><dd id="selection-section">—</dd></div>
+        <div><dt>Fila</dt><dd id="selection-row">—</dd></div>
+        <div><dt>Silla</dt><dd id="selection-number">—</dd></div>
+      </dl>
+    </section>
 
-{% for section, rows in sections.items() %}
-<h2>{{ section }}</h2>
-<div class="seat-map">
-  {% for row, row_seats in rows.items() %}
-  <div class="seat-row">
-    <span class="row-label">{{ row }}</span>
-    {% for seat in row_seats %}
-    <button type="button"
-            class="seat {{ seat.status }}"
-            data-seat-id="{{ seat.id }}"
-            data-label="{{ section }}, fila {{ row }}, silla {{ seat.seat_number }}"
-            {% if seat.status == "sold" %}disabled{% endif %}>{{ seat.seat_number }}</button>
-    {% endfor %}
-  </div>
-  {% endfor %}
+    <section class="card">
+      <h2 class="card-title">RESUMEN</h2>
+      <p id="summary-empty" class="muted">Aún no has seleccionado sillas.</p>
+      <form id="purchase-form" class="purchase-form" data-event-id="{{ event.id }}" hidden>
+        <label>Nombre
+          <input type="text" name="buyer_name" maxlength="100" required>
+        </label>
+        <label>Correo
+          <input type="email" name="buyer_email" maxlength="254" required>
+        </label>
+      </form>
+      <p id="purchase-message" class="message" role="status"></p>
+    </section>
+  </aside>
+
+  <!-- Columna derecha: leyenda, escenario y mapa de sillas -->
+  <section class="seat-panel">
+    <p class="legend">
+      <span class="legend-item"><span class="seat available"></span> Libre</span>
+      <span class="legend-item"><span class="seat selected"></span> Seleccionada</span>
+      <span class="legend-item"><span class="seat sold"></span> Vendida</span>
+    </p>
+
+    <div class="stage">ESCENARIO</div>
+
+    {# El mapa puede ser más ancho que la pantalla (50 sillas por fila): se desplaza de lado #}
+    <div class="seat-map-scroll">
+      <div class="seat-map">
+        {% for section, rows in sections.items() %}
+        <h2 class="section-name">{{ section }}</h2>
+        {% for row, row_seats in rows.items() %}
+        <div class="seat-row" data-section="{{ section }}" data-row="{{ row }}">
+          <span class="row-label">{{ row }}</span>
+          {% for seat in row_seats %}
+          <button type="button" class="seat {{ seat.status }}" data-seat-id="{{ seat.id }}" {% if seat.status == "sold" %}disabled{% endif %}><span class="seat-number">{{ seat.seat_number }}</span></button>
+          {% endfor %}
+        </div>
+        {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  </section>
 </div>
-{% endfor %}
+
+<!-- Barra fija de abajo: silla elegida y botón principal. El botón envía el formulario de RESUMEN. -->
+<div class="buy-bar">
+  <div class="buy-bar-content">
+    <div class="buy-bar-seat">
+      <span class="muted">Silla seleccionada</span>
+      <strong id="buy-bar-seat">Ninguna</strong>
+    </div>
+    <button type="submit" form="purchase-form" id="buy-button" class="button-primary" disabled>Comprar</button>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}

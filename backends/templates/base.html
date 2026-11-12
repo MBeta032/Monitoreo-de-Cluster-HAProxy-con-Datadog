@@ -6,10 +6,27 @@
   <title>{% block title %}Boletería Cali{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <header class="site-header">
     <a class="brand" href="{{ url_for('index') }}">Boletería Cali</a>
   </header>
+
+  {# Barra de pasos: cada página define current_step (1 Eventos, 2 Sillas, 3 Confirmación) #}
+  {% if current_step %}
+  <nav class="steps" aria-label="Pasos de la compra">
+    <ol>
+      <li class="step {% if current_step == 1 %}current{% endif %}" data-step="1">
+        <a href="{{ url_for('index') }}"><span class="step-number">1</span> Eventos</a>
+      </li>
+      <li class="step {% if current_step == 2 %}current{% endif %}" data-step="2">
+        <span class="step-number">2</span> Sillas
+      </li>
+      <li class="step {% if current_step == 3 %}current{% endif %}" data-step="3">
+        <span class="step-number">3</span> Confirmación
+      </li>
+    </ol>
+  </nav>
+  {% endif %}
 
   <main class="container">
     {% block content %}{% endblock %}

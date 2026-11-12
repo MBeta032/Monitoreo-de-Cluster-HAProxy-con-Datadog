@@ -1,15 +1,23 @@
 {% extends "base.html" %}
+{% set current_step = 1 %}
 
 {% block content %}
-<h1>Eventos en Cali</h1>
+<h1 class="page-title">Eventos en Cali</h1>
 <p class="intro">Elige un evento para ver las sillas y comprar la tuya.</p>
 
 <ul class="event-list">
   {% for event in events %}
-  <li class="event-card">
-    <h2><a href="{{ url_for('event_page', event_id=event.id) }}">{{ event.name }}</a></h2>
-    <p>{{ event.venue }} · {{ event.starts_at.strftime("%d/%m/%Y %H:%M") }}</p>
+  <li class="card event-summary">
+    {# Portada hecha con CSS: el degradado depende del id del evento #}
+    <div class="cover cover-{{ event.id % 3 }}">
+      <span class="cover-name">{{ event.name }}</span>
+      {% if event.available_seats == 0 %}<span class="badge-sold-out">AGOTADO</span>{% endif %}
+    </div>
+    <h2 class="event-name">{{ event.name }}</h2>
+    <p class="event-detail">{{ event.venue }}</p>
+    <p class="event-detail">{{ event.starts_at.strftime("%d/%m/%Y") }} · {{ event.starts_at.strftime("%H:%M") }} h</p>
     <p class="seats-left">Quedan {{ event.available_seats }} de {{ event.total_seats }} sillas</p>
+    <a class="button-primary" href="{{ url_for('event_page', event_id=event.id) }}">Ver sillas</a>
   </li>
   {% endfor %}
 </ul>
