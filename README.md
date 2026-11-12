@@ -513,6 +513,7 @@ python -m pytest -v
 ```
 
 Se usa `python -m pytest` (y no solo `pytest`) para que Python encuentre `app.py` desde la carpeta `backends`. Las mismas pruebas, más la construcción de la imagen, corren solas en GitHub Actions (`.github/workflows/backends-ci.yml`) en cada Pull Request hacia `develop` o `main` que cambie `backends/`.
+
 ---
 
 ## 7. Datadog Agent y cuenta
