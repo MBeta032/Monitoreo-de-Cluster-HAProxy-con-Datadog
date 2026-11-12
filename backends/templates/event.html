@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "steps.html" import steps_bar %}
+
+{% block title %}{{ event.name }}{% endblock %}
+{# Evento agotado: no hay barra de abajo (no hay silla que elegir) #}
+{% block body_class %}{% if event.available_seats > 0 %}has-bottom-bar{% endif %}{% endblock %}
+
+{% block content %}
+{% set map_url = url_for('event_page', event_id=event.id) %}
+{% if has_many_sections %}
+<p class="back-link"><a href="{{ map_url }}">← Cambiar zona</a></p>
+{% else %}
+<p class="back-link"><a href="{{ url_for('index') }}">← Volver a la cartelera</a></p>
+{% endif %}
+{{ steps_bar(1) }}
+
+{% if event.available_seats == 0 %}
+{% include "sold_out_notice.html" %}
+{% endif %}
+
+<div class="event-layout">
+
+  <!-- Columna izquierda: evento y silla elegida -->
+  <aside>
+    <section class="card event-summary">
+      <div class="color-band {{ event.category | category_class }}"></div>
+      <p class="event-category">{{ event.category }}</p>
+      <h1 class="event-title">{{ event.name }}</h1>
+      <p class="event-detail">{{ event.venue }}</p>
+      <p class="event-detail">{{ event.starts_at.strftime("%d/%m/%Y") }} · {{ event.starts_at.strftime("%H:%M") }} h</p>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">TU SELECCIÓN</h2>
+      <dl class="selection">
+        <div><dt>Zona</dt><dd id="selection-section">—</dd></div>
+        <div><dt>Fila</dt><dd id="selection-row">—</dd></div>
+        <div><dt>Silla</dt><dd id="selection-number">—</dd></div>
+      </dl>
+    </section>
+  </aside>
+
+  <!-- Columna derecha: leyenda, escenario y sillas de la zona -->
+  <section class="card seat-panel">
+    <h2 class="section-name">{{ section.section }} · Quedan {{ section.available_seats }} de {{ section.total_seats }}</h2>
+    <p class="legend">
+      <span class="legend-item"><span class="seat available" aria-hidden="true"></span> Libre</span>
+      <span class="legend-item"><span class="seat selected" aria-hidden="true"></span> Seleccionada</span>
+      <span class="legend-item"><span class="seat reserved" aria-hidden="true"></span> Ocupada</span>
+    </p>
+
+    <div class="stage">ESCENARIO</div>
+
+    <div class="seat-map-scroll">
+      <div class="seat-map">
+        {% for row, row_seats in rows.items() %}
+        {# La letra de la fila va a ambos lados y hay un pasillo en la mitad (entre la 12 y la 13 si son 25) #}
+        {% set aisle_position = row_seats | length // 2 %}
+        <div class="seat-row" data-section="{{ section.section }}" data-row="{{ row }}">
+          <span class="row-label">{{ row }}</span>
+          {% for seat in row_seats %}
+          {% if loop.index0 == aisle_position %}<span class="aisle"></span>{% endif %}
+          <button type="button" class="seat {{ seat.status }}" data-seat-id="{{ seat.id }}" aria-label="Fila {{ row }}, silla {{ seat.seat_number }}" {% if seat.status != "available" %}disabled{% endif %}><span class="seat-number">{{ seat.seat_number }}</span></button>
+          {% endfor %}
+          <span class="row-label">{{ row }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
+
+{% if event.available_seats > 0 %}
+<!-- Barra fija de abajo: silla elegida, cambiar zona y "Continuar" (lleva a la página Confirmar) -->
+<form class="bottom-bar" method="get" action="{{ url_for('confirm_page', event_id=event.id) }}">
+  <div class="bottom-bar-content">
+    <p class="bottom-bar-seat">
+      <span class="muted">Silla seleccionada:</span>
+      <strong id="bottom-bar-seat">Ninguna</strong>
+    </p>
+    <div class="bottom-bar-actions">
+      {% if has_many_sections %}
+      <a href="{{ map_url }}">Cambiar zona</a>
+      {% endif %}
+      <input type="hidden" name="seat" id="selected-seat-id">
+      <button type="submit" id="continue-button" class="button-primary" disabled>Continuar →</button>
+    </div>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if event.available_seats > 0 %}
+<script src="{{ url_for('static', filename='seat_picker.js') }}"></script>
+{% endif %}
+{% endblock %}

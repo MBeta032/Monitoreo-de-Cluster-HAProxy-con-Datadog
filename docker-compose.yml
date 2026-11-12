@@ -31,7 +31,7 @@ services:
   # Límites por backend: 1 CPU y 384 MB (Compose v2 aplica deploy.resources sin Swarm).
   backend1:
     build: ./backends
-    image: haproxy-telematicos-backend:1.0.0
+    image: haproxy-telematicos-backend:2.0.0
     restart: unless-stopped
     container_name: backend1
     hostname: backend1
@@ -39,6 +39,16 @@ services:
       INSTANCE_NAME: backend1
       PORT: 5000
       WEB_CONCURRENCY: ${BACKEND1_WORKERS:-2}
+      # Conexión a PostgreSQL con las variables estándar de libpq
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB:-boleteria}
+      PGUSER: ${POSTGRES_USER:-boleteria}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+      # Firma la cookie de sesión: la MISMA en los 3 backends para que todos reconozcan la sesión
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en el archivo .env (ver .env.example)}
+    depends_on:
+      db:
+        condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend1"}]'
     networks:
@@ -51,7 +61,7 @@ services:
 
   backend2:
     build: ./backends
-    image: haproxy-telematicos-backend:1.0.0
+    image: haproxy-telematicos-backend:2.0.0
     restart: unless-stopped
     container_name: backend2
     hostname: backend2
@@ -59,6 +69,16 @@ services:
       INSTANCE_NAME: backend2
       PORT: 5000
       WEB_CONCURRENCY: ${BACKEND2_WORKERS:-2}
+      # Conexión a PostgreSQL con las variables estándar de libpq
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB:-boleteria}
+      PGUSER: ${POSTGRES_USER:-boleteria}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+      # Firma la cookie de sesión: la MISMA en los 3 backends para que todos reconozcan la sesión
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en el archivo .env (ver .env.example)}
+    depends_on:
+      db:
+        condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend2"}]'
     networks:
@@ -71,7 +91,7 @@ services:
 
   backend3:
     build: ./backends
-    image: haproxy-telematicos-backend:1.0.0
+    image: haproxy-telematicos-backend:2.0.0
     restart: unless-stopped
     container_name: backend3
     hostname: backend3
@@ -79,6 +99,16 @@ services:
       INSTANCE_NAME: backend3
       PORT: 5000
       WEB_CONCURRENCY: ${BACKEND3_WORKERS:-2}
+      # Conexión a PostgreSQL con las variables estándar de libpq
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB:-boleteria}
+      PGUSER: ${POSTGRES_USER:-boleteria}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+      # Firma la cookie de sesión: la MISMA en los 3 backends para que todos reconozcan la sesión
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en el archivo .env (ver .env.example)}
+    depends_on:
+      db:
+        condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend3"}]'
     networks:
@@ -88,6 +118,33 @@ services:
         limits:
           cpus: "1"
           memory: 384M
+
+  # --- db (Esteban) ---
+  # Base de datos de la boletería. El puerto 5432 no se publica: solo la usan los backends por cluster-net.
+  # Los scripts de ./db/init corren una sola vez, cuando el volumen pg-data está vacío.
+  db:
+    image: postgres:17.11
+    restart: unless-stopped
+    container_name: db
+    hostname: db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-boleteria}
+      POSTGRES_USER: ${POSTGRES_USER:-boleteria}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    # Se consulta por TCP (-h 127.0.0.1): mientras corren los scripts de init, PostgreSQL
+    # solo escucha por socket local, así que no queda healthy antes de terminar de cargar los datos.
+    # $$ hace que la variable la lea el contenedor y no Compose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - cluster-net
 
   # --- datadog-agent (Jhon) ---
   datadog-agent:
@@ -124,3 +181,6 @@ volumes:
   # Cajón compartido donde HAProxy deja su socket y el Datadog Agent lo lee.
   haproxy-socket:
     name: haproxy-socket
+  # Datos de PostgreSQL (eventos y sillas). Se conservan aunque se borren los contenedores.
+  pg-data:
+    name: pg-data

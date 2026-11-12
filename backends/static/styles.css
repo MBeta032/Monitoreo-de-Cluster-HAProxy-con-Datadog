@@ -1,0 +1,1149 @@
+/* Taquilla Sucursal: CSS simple, sin frameworks ni fuentes externas.
+   Todos los colores se cambian aquí, en un solo lugar. Cada color significa una sola cosa,
+   y todo texto sobre color tiene contraste de al menos 4.5:1. */
+
+:root {
+  /* Base */
+  --color-background: #f4f5f8;
+  --color-card: #ffffff;
+  --color-header: #14213d;
+  --color-text: #1b1f24;
+  --color-muted: #5c6370;
+  --color-border: #e1e4ea;
+
+  /* Acción principal y paso actual */
+  --color-accent: #fca311;
+  --color-accent-hover: #e8920a;
+  --color-on-accent: #14213d;
+
+  /* Sillas */
+  --color-seat-free: #1f3a68;
+  --color-seat-free-hover: #2f5597;
+  --color-seat-selected: #2ec4b6;
+  --color-seat-taken: #d9dce3;
+  --color-seat-taken-text: #4b5260;
+
+  /* Estados */
+  --color-sold-out: #d62828;
+  --color-confirmed: #13795b;
+  --color-last-seats-bg: #fff1d6;
+  --color-last-seats-text: #7a4b00;
+  --color-error-bg: #fdecec;
+  --color-error-text: #a61b1b;
+
+  /* Zonas (solo en el plano) */
+  --color-zone-platea: #6d5bd0;
+  --color-zone-central: #a3174e;
+  --color-zone-side: #1d6fd8;
+
+  /* Categorías (portada de las tarjetas) */
+  --color-category-concert: #c2410c;
+  --color-category-theater: #0f766e;
+  --color-category-music: #334e68;
+  --color-category-storytelling: #7c5e10;
+}
+
+/* --- Base --- */
+
+* {
+  box-sizing: border-box;
+}
+
+/* El atributo hidden siempre oculta, aunque otra regla diga display: flex */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  color: var(--color-text);
+  background: var(--color-background);
+  line-height: 1.4;
+}
+
+a {
+  color: var(--color-seat-free);
+}
+
+h1, h2, h3 {
+  line-height: 1.2;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+.centered {
+  text-align: center;
+}
+
+.page-title {
+  margin: 0 0 8px;
+  font-size: 1.7rem;
+}
+
+.intro {
+  margin-top: 0;
+  color: var(--color-muted);
+}
+
+.back-link {
+  margin: 0 0 12px;
+}
+
+.back-link a {
+  text-decoration: none;
+  font-weight: bold;
+}
+
+/* --- Encabezado: marca, navegación y usuario --- */
+
+.site-header {
+  background: var(--color-header);
+  color: #ffffff;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 1.15rem;
+}
+
+/* Cuadrito ámbar con "TS" */
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+.main-nav {
+  display: flex;
+  gap: 20px;
+}
+
+.main-nav a {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.main-nav a:hover {
+  text-decoration: underline;
+}
+
+.user-nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #ffffff;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.site-footer {
+  padding: 16px 24px 24px;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+/* --- Botones y etiquetas --- */
+
+.button-primary {
+  display: inline-block;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-weight: bold;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button-primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.button-primary:disabled,
+.button-disabled {
+  display: inline-block;
+  padding: 12px 24px;
+  border-radius: 6px;
+  background: var(--color-seat-taken);
+  color: var(--color-seat-taken-text);
+  font-weight: bold;
+  cursor: not-allowed;
+}
+
+.button-wide {
+  width: 100%;
+}
+
+/* Botón claro sobre la barra oscura (Iniciar sesión) */
+.button-secondary {
+  padding: 8px 16px;
+  border: 1px solid #ffffff;
+  border-radius: 6px;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+/* Botón con borde sobre fondo claro */
+.button-secondary-light {
+  display: inline-block;
+  padding: 11px 23px;
+  border: 1px solid var(--color-header);
+  border-radius: 6px;
+  color: var(--color-header);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+}
+
+.badge-sold-out {
+  background: var(--color-sold-out);
+  color: #ffffff;
+}
+
+.badge-last {
+  background: var(--color-last-seats-bg);
+  color: var(--color-last-seats-text);
+}
+
+.badge-neutral {
+  background: var(--color-background);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.badge-confirmed {
+  background: var(--color-confirmed);
+  color: #ffffff;
+}
+
+.notice-error {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+  font-weight: bold;
+}
+
+.notice-error a {
+  color: var(--color-error-text);
+}
+
+/* Aviso de evento agotado (plano y sillas) */
+.sold-out-notice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  background: var(--color-error-bg);
+}
+
+.sold-out-text {
+  margin: 6px 0 0;
+  color: var(--color-error-text);
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+/* --- Tarjetas y datos del evento --- */
+
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  color: var(--color-muted);
+}
+
+.event-category {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.event-name {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+}
+
+.event-title {
+  margin: 0 0 8px;
+  font-size: 1.4rem;
+}
+
+.event-detail {
+  margin: 4px 0;
+  color: var(--color-muted);
+}
+
+/* Banda de color de la categoría (arriba de una tarjeta) */
+.color-band {
+  height: 8px;
+  margin: -20px -20px 16px;
+  border-radius: 10px 10px 0 0;
+}
+
+/* Colores de categoría: portadas y bandas */
+.category-concert { background: var(--color-category-concert); }
+.category-theater { background: var(--color-category-theater); }
+.category-music { background: var(--color-category-music); }
+.category-storytelling { background: var(--color-category-storytelling); }
+.category-other { background: var(--color-header); }
+
+/* --- Cartelera --- */
+
+.flash-sale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  border-radius: 12px;
+  background: var(--color-header);
+  color: #ffffff;
+}
+
+.flash-sale p {
+  margin: 4px 0;
+}
+
+.flash-label {
+  color: var(--color-accent);
+  font-weight: bold;
+  letter-spacing: 0.12em;
+  font-size: 0.85rem;
+}
+
+.flash-name {
+  margin: 4px 0;
+  font-size: 1.8rem;
+}
+
+.flash-seats strong {
+  color: var(--color-accent);
+  font-size: 1.2rem;
+}
+
+.event-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.event-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  margin: 0;
+}
+
+/* Portada de color sólido con el día y el mes en un recuadro blanco */
+.cover {
+  height: 120px;
+  padding: 14px;
+}
+
+.date-box {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 52px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--color-text);
+}
+
+.date-day {
+  font-size: 1.4rem;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.date-month {
+  font-size: 0.75rem;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+}
+
+.date-box-dark {
+  background: var(--color-header);
+  color: #ffffff;
+}
+
+.event-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  flex-grow: 1;
+}
+
+.event-card-action {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+/* --- Barra de pasos: 1 Ubicación · 2 Confirmar · 3 Listo --- */
+
+.steps ol {
+  list-style: none;
+  margin: 16px 0 20px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 20px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-border);
+  color: var(--color-text);
+  font-weight: bold;
+  font-size: 0.85rem;
+}
+
+/* Paso actual: azul oscuro con el número en ámbar */
+.step.current {
+  background: var(--color-header);
+  border-color: var(--color-header);
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.step.current .step-number {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* Paso hecho: con ✓ */
+.step.done {
+  color: var(--color-text);
+}
+
+.step.done .step-number {
+  background: var(--color-confirmed);
+  color: #ffffff;
+}
+
+/* --- Escenario: una línea curva ámbar con el texto espaciado --- */
+
+.stage {
+  margin: 0 auto 24px;
+  width: 70%;
+  max-width: 520px;
+  height: 36px;
+  border-top: 6px solid var(--color-accent);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  padding-top: 8px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.6em;
+  color: var(--color-muted);
+}
+
+.legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 16px 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-color {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+/* --- Plano de zonas --- */
+
+.map-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* Grilla de 3 columnas: las graderías laterales son altas (2 filas),
+   Platea va al centro pegada al escenario y Gradería Central debajo */
+.venue-map {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  grid-template-areas:
+    "left platea right"
+    "left central right";
+  gap: 12px;
+}
+
+.zone {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  min-height: 110px;
+  padding: 16px 10px;
+  border-radius: 10px;
+  color: #ffffff;
+  text-align: center;
+  text-decoration: none;
+}
+
+a.zone:hover {
+  outline: 3px solid var(--color-accent);
+}
+
+.zone-platea {
+  grid-area: platea;
+  background: var(--color-zone-platea);
+}
+
+.zone-central {
+  grid-area: central;
+  background: var(--color-zone-central);
+}
+
+.zone-left {
+  grid-area: left;
+  background: var(--color-zone-side);
+}
+
+.zone-right {
+  grid-area: right;
+  background: var(--color-zone-side);
+}
+
+/* Zona sin posición conocida: ocupa todo el ancho, debajo */
+.zone-other {
+  grid-column: 1 / -1;
+  background: var(--color-seat-free);
+}
+
+/* Zona llena: gris, con AGOTADO y sin enlace */
+.zone.zone-sold-out,
+.legend-color.zone-sold-out {
+  background: var(--color-seat-taken);
+  color: var(--color-seat-taken-text);
+}
+
+.availability-total {
+  margin: 0 0 8px;
+}
+
+.availability-total strong {
+  font-size: 1.6rem;
+}
+
+.progress {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--color-seat-taken);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--color-seat-free);
+}
+
+.zone-summary {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+
+.zone-summary li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.zone-summary .legend-color {
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.note {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--color-background);
+}
+
+.note p {
+  margin: 4px 0 0;
+  color: var(--color-muted);
+}
+
+/* --- Sillas de una zona --- */
+
+.event-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* min-width: 0 deja que el mapa se desplace dentro de la columna si no cabe */
+.seat-panel {
+  min-width: 0;
+}
+
+.section-name {
+  margin: 0;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.selection {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+}
+
+.selection dt {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.selection dd {
+  margin: 4px 0 0;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.seat-map-scroll {
+  overflow-x: auto;
+  text-align: center;
+  padding-bottom: 8px;
+}
+
+.seat-map {
+  display: inline-block;
+  text-align: left;
+}
+
+.seat-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.row-label {
+  width: 20px;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: bold;
+  color: var(--color-muted);
+}
+
+/* Pasillo en la mitad de cada fila */
+.aisle {
+  width: 18px;
+  flex-shrink: 0;
+}
+
+/* Cada silla es un cuadrito redondeado con su número adentro */
+.seat {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.7rem;
+}
+
+.seat.available {
+  background: var(--color-seat-free);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.seat.available:hover {
+  background: var(--color-seat-free-hover);
+}
+
+/* La silla seleccionada muestra un ✓ en lugar del número */
+.seat.selected,
+.seat.selected:hover {
+  background: var(--color-seat-selected);
+  color: var(--color-header);
+  font-weight: bold;
+}
+
+.seat.selected .seat-number {
+  display: none;
+}
+
+.seat.selected::after {
+  content: "✓";
+}
+
+.seat.reserved {
+  background: var(--color-seat-taken);
+  color: var(--color-seat-taken-text);
+  cursor: not-allowed;
+}
+
+/* Barra fija de abajo: silla elegida, cambiar zona y Continuar */
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 12px 24px;
+  background: var(--color-card);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -2px 10px rgba(20, 33, 61, 0.08);
+}
+
+.bottom-bar-content {
+  max-width: 1152px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.bottom-bar-seat {
+  margin: 0;
+}
+
+.bottom-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Espacio al final para que la barra fija no tape el contenido */
+body.has-bottom-bar {
+  padding-bottom: 100px;
+}
+
+/* --- Iniciar sesión y crear cuenta --- */
+
+.auth-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+/* El enlace de volver queda alineado con el recuadro y la tarjeta */
+.auth-back {
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Sin recuadro "ESTÁS RESERVANDO", la tarjeta va sola y centrada */
+.auth-card:only-child {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.reserving-box {
+  padding: 24px;
+  border-radius: 10px;
+  background: var(--color-header);
+  color: #ffffff;
+}
+
+.reserving-label {
+  margin: 0 0 8px;
+  color: var(--color-accent);
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 0.12em;
+}
+
+.reserving-event {
+  margin: 0 0 8px;
+  font-size: 1.4rem;
+}
+
+.reserving-seat {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.auth-tabs a {
+  padding: 8px 0;
+  color: var(--color-muted);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+}
+
+.auth-tabs a.active {
+  color: var(--color-text);
+  font-weight: bold;
+  border-bottom-color: var(--color-accent);
+}
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-stack label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: bold;
+}
+
+.form-stack input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font: inherit;
+  font-weight: normal;
+}
+
+/* --- Confirmar --- */
+
+.confirm-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.summary-list {
+  margin: 0;
+}
+
+.summary-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.summary-list dt {
+  color: var(--color-muted);
+}
+
+.summary-list dd {
+  margin: 0;
+  font-weight: bold;
+  text-align: right;
+}
+
+/* --- Listo: boleta --- */
+
+.done-box {
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.done-check {
+  width: 72px;
+  height: 72px;
+  line-height: 72px;
+  margin: 8px auto 12px;
+  border-radius: 50%;
+  background: var(--color-seat-selected);
+  color: var(--color-header);
+  font-size: 2.2rem;
+  font-weight: bold;
+}
+
+.ticket {
+  margin: 20px 0;
+  text-align: left;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ticket-band {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--color-header);
+  color: #ffffff;
+}
+
+.ticket-label {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: var(--color-accent);
+}
+
+.ticket-code {
+  margin: 2px 0 0;
+  font-size: 1.6rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+
+.ticket-body {
+  padding: 16px 20px;
+  border-bottom: 2px dashed var(--color-border);
+}
+
+.ticket-details {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.ticket-details div {
+  display: flex;
+  flex-direction: column;
+}
+
+.done-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* --- Mis reservas --- */
+
+.reservation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.reservation-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.reservation-info {
+  flex-grow: 1;
+}
+
+.reservation-info p {
+  margin: 4px 0;
+}
+
+.reservation-code {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  font-weight: bold;
+}
+
+.empty-state,
+.error-box {
+  max-width: 520px;
+  margin: 24px auto;
+  text-align: center;
+}
+
+.error-code {
+  margin: 0;
+  font-size: 3rem;
+  font-weight: bold;
+  color: var(--color-header);
+}
+
+/* --- Celular: todo se apila y nada se sale de la pantalla --- */
+
+@media (max-width: 860px) {
+  .container {
+    padding: 16px;
+  }
+
+  .map-layout,
+  .event-layout,
+  .confirm-layout,
+  .auth-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .flash-name {
+    font-size: 1.4rem;
+  }
+
+  .seat {
+    width: 22px;
+    height: 22px;
+    font-size: 0.6rem;
+  }
+
+  .seat-row {
+    gap: 2px;
+  }
+
+  .aisle {
+    width: 10px;
+  }
+
+  .row-label {
+    width: 16px;
+  }
+
+  .ticket-details {
+    grid-template-columns: repeat(2, auto);
+  }
+
+  .reservation-item {
+    flex-wrap: wrap;
+  }
+
+  .reservation-code {
+    align-items: flex-start;
+  }
+
+  .bottom-bar {
+    padding: 10px 16px;
+  }
+}
+
+@media (max-width: 520px) {
+  .user-name {
+    display: none;
+  }
+
+  .venue-map .zone {
+    min-height: 90px;
+    font-size: 0.85rem;
+  }
+}

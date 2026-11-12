@@ -1,3 +1,6 @@
 Flask==3.1.0
+Werkzeug==3.1.9
 prometheus-client==0.21.1
 gunicorn==23.0.0
+psycopg[binary]==3.3.8
+psycopg-pool==3.3.3

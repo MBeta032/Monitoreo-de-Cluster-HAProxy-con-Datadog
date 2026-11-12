@@ -65,6 +65,12 @@ logconfig_dict = {
             "handlers": ["discard"],
             "propagate": False,
         },
+        # Avisos de psycopg y de su pool (por ejemplo, cuando no puede conectarse a db) en JSON
+        "psycopg": {
+            "level": "WARNING",
+            "handlers": ["json_stdout"],
+            "propagate": False,
+        },
     },
     # Se reemplaza el root de CONFIG_DEFAULTS, que apunta a un handler que aquí no existe.
     # Queda igual al valor por defecto de Python: nivel WARNING y sin handlers.
@@ -83,6 +89,14 @@ def on_starting(server):
     os.makedirs(metrics_dir, exist_ok=True)
     for file_name in os.listdir(metrics_dir):
         os.remove(os.path.join(metrics_dir, file_name))
+
+
+def post_worker_init(worker):
+    # Corre dentro de cada worker, después del fork y de cargar app.py.
+    # Cada worker abre su propio pool de conexiones a PostgreSQL (los procesos no comparten conexiones).
+    # Se importa aquí y no arriba para que el proceso maestro no cree el pool.
+    import db
+    db.pool.open()
 
 
 def child_exit(server, worker):

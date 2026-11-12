@@ -13,3 +13,6 @@ desktop.ini
 # Cachés que crean Python y pytest al correr las pruebas
 __pycache__/
 .pytest_cache/
+
+# Configuración local de Claude Code (permisos de esta máquina)
+.claude/settings.local.json
