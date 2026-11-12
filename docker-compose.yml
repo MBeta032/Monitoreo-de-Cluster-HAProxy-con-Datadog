@@ -131,6 +131,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-boleteria}
       POSTGRES_USER: ${POSTGRES_USER:-boleteria}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+      # Contraseña del usuario de solo lectura "datadog" (la usa db/init/03_datadog_user.sh)
+      DD_POSTGRES_PASSWORD: ${DD_POSTGRES_PASSWORD:?Define DD_POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
+    # Deja en el log de PostgreSQL toda consulta que tarde más de 250 ms
+    command: ["postgres", "-c", "log_min_duration_statement=250"]
+    labels:
+      # Check de PostgreSQL por Autodiscovery. %%env_DD_POSTGRES_PASSWORD%% lo reemplaza el Agent
+      # con su propia variable de entorno: la contraseña no queda escrita en el repo.
+      # "relations" activa las métricas por tabla y la de bloqueos (postgresql.locks) de las dos
+      # tablas que más se usan en la venta flash.
+      com.datadoghq.ad.checks: '{"postgres": {"instances": [{"host": "db", "port": 5432, "username": "datadog", "password": "%%env_DD_POSTGRES_PASSWORD%%", "dbname": "${POSTGRES_DB:-boleteria}", "relations": [{"relation_name": "seats"}, {"relation_name": "reservations"}], "tags": ["project:haproxy-telematicos", "env:lab"]}]}}'
+      com.datadoghq.ad.logs: '[{"source":"postgresql","service":"db"}]'
     volumes:
       - pg-data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d:ro
@@ -160,6 +171,8 @@ services:
       DD_SITE: ${DD_SITE}
       DD_HOSTNAME: haproxy-telematicos-lab
       DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "false"
+      # La lee el check de postgres (etiqueta del servicio db) con %%env_DD_POSTGRES_PASSWORD%%
+      DD_POSTGRES_PASSWORD: ${DD_POSTGRES_PASSWORD:?Define DD_POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
     group_add:
       - "99"
     volumes:
