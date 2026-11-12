@@ -134,8 +134,46 @@ def reservation_code(reservation_id):
     # Código que ve el usuario: "TS-" más el id con 6 dígitos (TS-000482)
     return f"TS-{reservation_id:06d}"
 
-# Las plantillas lo usan como filtro: {{ reservation.id | reservation_code }}
+# Ubicación de cada zona en el plano de la arena (es una clase CSS de la grilla).
+# Una zona que no esté aquí se muestra igual, debajo, sin posición fija.
+ZONE_CLASSES = {
+    "Platea": "zone-platea",
+    "Gradería Central": "zone-central",
+    "Gradería Izquierda": "zone-left",
+    "Gradería Derecha": "zone-right",
+}
+
+# Color de la portada de cada categoría (clase CSS)
+CATEGORY_CLASSES = {
+    "Concierto": "category-concert",
+    "Teatro": "category-theater",
+    "Música": "category-music",
+    "Narración oral": "category-storytelling",
+}
+
+MONTH_NAMES = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
+
+def zone_class(section_name):
+    return ZONE_CLASSES.get(section_name, "zone-other")
+
+def category_class(category):
+    return CATEGORY_CLASSES.get(category, "category-other")
+
+def month_short(date):
+    # Mes abreviado en español (DIC), sin depender del idioma del sistema operativo
+    return MONTH_NAMES[date.month - 1]
+
+def initials(name):
+    # Iniciales para el encabezado: "Prueba 001" -> "P0", "Ana Pérez" -> "AP"
+    words = name.split()
+    return "".join(word[0] for word in words[:2]).upper()
+
+# Filtros para las plantillas, por ejemplo {{ reservation.id | reservation_code }}
 app.add_template_filter(reservation_code)
+app.add_template_filter(zone_class)
+app.add_template_filter(category_class)
+app.add_template_filter(month_short)
+app.add_template_filter(initials)
 
 def group_seats_by_row(seats):
     # Agrupa las sillas de una zona por fila, en el mismo orden en que llegan de la base.
@@ -188,10 +226,10 @@ def confirm_page(event_id):
     seat_id = request.args.get("seat", type=int)
     if seat_id is None:
         abort(404)
-    # Sin sesión: primero iniciar sesión y volver aquí. Se pasa también la silla
+    # Sin sesión: primero iniciar sesión y volver aquí. Se pasan también el evento y la silla
     # para que la página de inicio de sesión muestre qué se está reservando.
     if auth.get_current_user() is None:
-        return redirect(url_for("login", next=request.full_path, seat=seat_id))
+        return redirect(url_for("login", next=request.full_path, event=event_id, seat=seat_id))
 
     seat = db.get_seat(event_id, seat_id)
     if seat is None:
@@ -207,7 +245,7 @@ def confirm_reservation(event_id):
     user = auth.get_current_user()
     if user is None:
         confirm_url = url_for("confirm_page", event_id=event_id, seat=seat_id)
-        return redirect(url_for("login", next=confirm_url, seat=seat_id))
+        return redirect(url_for("login", next=confirm_url, event=event_id, seat=seat_id))
 
     if not auth.csrf_token_is_valid(request.form.get("csrf_token")):
         abort(403)
@@ -249,6 +287,25 @@ def get_next_url():
         return next_url
     return url_for("index")
 
+def get_reserving_seat():
+    # Silla que se está reservando, si el inicio de sesión viene de la página Confirmar.
+    # Sirve para el recuadro "ESTÁS RESERVANDO". Si los datos no son válidos, no se muestra.
+    event_id = request.values.get("event", type=int)
+    seat_id = request.values.get("seat", type=int)
+    if event_id is None or seat_id is None:
+        return None
+    return db.get_seat(event_id, seat_id)
+
+def render_auth_page(mode, status_code=200, **values):
+    # Iniciar sesión y crear cuenta usan la misma plantilla (dos pestañas)
+    return render_template(
+        "auth.html",
+        mode=mode,
+        next_url=get_next_url(),
+        reserving_seat=get_reserving_seat(),
+        **values,
+    ), status_code
+
 def validate_registration(name, email, password):
     # Devuelve el mensaje de error, o None si los datos de la cuenta nueva están bien
     if name == "":
@@ -263,9 +320,8 @@ def validate_registration(name, email, password):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    next_url = get_next_url()
     if request.method == 'GET':
-        return render_template("auth.html", mode="login", next_url=next_url)
+        return render_auth_page("login")
 
     if not auth.csrf_token_is_valid(request.form.get("csrf_token")):
         abort(403)
@@ -274,19 +330,17 @@ def login():
     password = request.form.get("password", "")
     user = db.get_user_by_email(email)
     if user is None or not auth.password_matches(user["password_hash"], password):
-        return render_template(
-            "auth.html", mode="login", next_url=next_url, email=email,
-            error_message="Correo o contraseña incorrectos.",
-        ), 401
+        return render_auth_page(
+            "login", 401, email=email, error_message="Correo o contraseña incorrectos."
+        )
 
     auth.start_session(user["id"])
-    return redirect(next_url)
+    return redirect(get_next_url())
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    next_url = get_next_url()
     if request.method == 'GET':
-        return render_template("auth.html", mode="register", next_url=next_url)
+        return render_auth_page("register")
 
     if not auth.csrf_token_is_valid(request.form.get("csrf_token")):
         abort(403)
@@ -296,20 +350,17 @@ def register():
     password = request.form.get("password", "")
     error_message = validate_registration(name, email, password)
     if error_message is not None:
-        return render_template(
-            "auth.html", mode="register", next_url=next_url, name=name, email=email,
-            error_message=error_message,
-        ), 400
+        return render_auth_page("register", 400, name=name, email=email, error_message=error_message)
 
     user_id = db.create_user(name, email, auth.hash_password(password))
     if user_id is None:
-        return render_template(
-            "auth.html", mode="register", next_url=next_url, name=name, email=email,
+        return render_auth_page(
+            "register", 409, name=name, email=email,
             error_message="Ya existe una cuenta con ese correo. Inicia sesión.",
-        ), 409
+        )
 
     auth.start_session(user_id)
-    return redirect(next_url)
+    return redirect(get_next_url())
 
 @app.route('/logout', methods=['POST'])
 def logout():
@@ -459,12 +510,35 @@ def api_list_reservations():
     reservations = db.list_user_reservations(user["id"])
     return jsonify([reservation_to_json(reservation) for reservation in reservations]), 200
 
+# --- Páginas de error: la API responde JSON; las páginas web, error.html con el estilo del sitio ---
+
+@app.errorhandler(403)
+def forbidden(error):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Forbidden", "message": "No se pudo verificar la solicitud"}), 403
+    return render_template(
+        "error.html",
+        status_code=403,
+        title="No pudimos verificar tu solicitud",
+        message="Vuelve a cargar la página e intenta de nuevo.",
+    ), 403
+
+@app.errorhandler(404)
+def not_found(error):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Not Found", "message": "La ruta no existe"}), 404
+    return render_template(
+        "error.html",
+        status_code=404,
+        title="No encontramos esta página",
+        message="Puede que el evento, la zona o la reserva no existan.",
+    ), 404
+
 @app.errorhandler(psycopg.OperationalError)
 def database_unavailable(error):
     # La base no responde: error de conexión, o se acabó la espera por una conexión del pool
     # (PoolTimeout también es un OperationalError). Esta respuesta pasa por after_request,
     # así que se cuenta en las métricas y deja una línea de log con level ERROR.
-    # La API responde JSON; las páginas web responden una página HTML sencilla.
     if request.path.startswith("/api/"):
         return jsonify({
             "error": "Service Unavailable",
@@ -472,7 +546,12 @@ def database_unavailable(error):
         }), 503
     # El encabezado no consulta al usuario: la base está caída
     g.user = None
-    return render_template("503.html"), 503
+    return render_template(
+        "error.html",
+        status_code=503,
+        title="Servicio no disponible",
+        message="No pudimos consultar la cartelera en este momento. Intenta en unos minutos.",
+    ), 503
 
 if __name__ == '__main__':
     # Solo para pruebas manuales sin Gunicorn: abre el pool aquí

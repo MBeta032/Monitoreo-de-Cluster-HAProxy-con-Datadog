@@ -3,41 +3,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Boletería Cali{% endblock %}</title>
+  <title>{% block title %}Cartelera{% endblock %} - Taquilla Sucursal</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body class="{% block body_class %}{% endblock %}">
   <header class="site-header">
-    <a class="brand" href="{{ url_for('index') }}">Boletería Cali</a>
-    <div class="user-nav">
-      <a href="{{ url_for('index') }}">Cartelera</a>
-      <a href="{{ url_for('reservations_page') }}">Mis reservas</a>
-      {% if current_user %}
-      <span>{{ current_user.name }}</span>
-      <form method="post" action="{{ url_for('logout') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="link-button">Cerrar sesión</button>
-      </form>
-      {% else %}
-      <a href="{{ url_for('login') }}">Iniciar sesión</a>
-      {% endif %}
+    <div class="header-content">
+      <a class="brand" href="{{ url_for('index') }}">
+        <span class="brand-mark">TS</span>
+        <span class="brand-name">Taquilla Sucursal</span>
+      </a>
+
+      <nav class="main-nav" aria-label="Principal">
+        <a href="{{ url_for('index') }}">Cartelera</a>
+        <a href="{{ url_for('reservations_page') }}">Mis reservas</a>
+      </nav>
+
+      <div class="user-nav">
+        {% if current_user %}
+        <span class="user-initials" aria-hidden="true">{{ current_user.name | initials }}</span>
+        <span class="user-name">{{ current_user.name }}</span>
+        <form method="post" action="{{ url_for('logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="link-button">Cerrar sesión</button>
+        </form>
+        {% else %}
+        <a class="button-secondary" href="{{ url_for('login') }}">Iniciar sesión</a>
+        {% endif %}
+      </div>
     </div>
   </header>
-
-  {# Barra de pasos de la reserva: cada página define current_step (1 Ubicación, 2 Confirmar, 3 Listo).
-     Los pasos anteriores al actual se marcan como hechos (✓). #}
-  {% if current_step %}
-  <nav class="steps" aria-label="Pasos de la reserva">
-    <ol>
-      {% for step_name in ["Ubicación", "Confirmar", "Listo"] %}
-      {% set step_number = loop.index %}
-      <li class="step {% if step_number == current_step %}current{% elif step_number < current_step %}done{% endif %}">
-        <span class="step-number">{% if step_number < current_step %}✓{% else %}{{ step_number }}{% endif %}</span> {{ step_name }}
-      </li>
-      {% endfor %}
-    </ol>
-  </nav>
-  {% endif %}
 
   <main class="container">
     {% block content %}{% endblock %}

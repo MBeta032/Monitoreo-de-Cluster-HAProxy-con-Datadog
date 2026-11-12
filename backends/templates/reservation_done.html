@@ -1,30 +1,40 @@
 {% extends "base.html" %}
-{% set current_step = 3 %}
+{% from "steps.html" import steps_bar %}
 
-{% block title %}Reserva confirmada - Boletería Cali{% endblock %}
+{% block title %}Reserva confirmada{% endblock %}
 
 {% block content %}
+{{ steps_bar(3) }}
+
 <div class="done-box">
-  <div class="done-check">✓</div>
+  <div class="done-check" aria-hidden="true">✓</div>
   <h1 class="page-title">¡Reserva confirmada!</h1>
 
-  <section class="card ticket">
-    <p class="muted">CÓDIGO DE RESERVA</p>
-    <p class="ticket-code">{{ reservation.id | reservation_code }}</p>
-    <p><span class="badge-confirmed">Confirmada</span></p>
-    <h2>{{ reservation.event_name }}</h2>
-    <p class="event-detail">{{ reservation.venue }} · {{ reservation.starts_at.strftime("%d/%m/%Y · %H:%M") }} h</p>
-    <dl class="summary-list">
-      <div><dt>Zona</dt><dd>{{ reservation.section }}</dd></div>
-      <div><dt>Fila</dt><dd>{{ reservation.seat_row }}</dd></div>
-      <div><dt>Silla</dt><dd>{{ reservation.seat_number }}</dd></div>
-      <div><dt>Nombre</dt><dd>{{ reservation.user_name }}</dd></div>
-    </dl>
+  {# Boleta: banda oscura con el código, el evento, una línea punteada y la ubicación #}
+  <section class="ticket">
+    <div class="ticket-band">
+      <div>
+        <p class="ticket-label">CÓDIGO DE RESERVA</p>
+        <p class="ticket-code">{{ reservation.id | reservation_code }}</p>
+      </div>
+      <span class="badge badge-confirmed">Confirmada</span>
+    </div>
+    <div class="ticket-body">
+      <h2 class="event-name">{{ reservation.event_name }}</h2>
+      <p class="event-detail">{{ reservation.venue }}</p>
+      <p class="event-detail">{{ reservation.starts_at.strftime("%d/%m/%Y · %H:%M") }} h</p>
+    </div>
+    <div class="ticket-details">
+      <div><span class="muted">Zona</span><strong>{{ reservation.section }}</strong></div>
+      <div><span class="muted">Fila</span><strong>{{ reservation.seat_row }}</strong></div>
+      <div><span class="muted">Silla</span><strong>{{ reservation.seat_number }}</strong></div>
+      <div><span class="muted">Nombre</span><strong>{{ reservation.user_name }}</strong></div>
+    </div>
   </section>
 
-  <p>
+  <p class="done-actions">
     <a class="button-primary" href="{{ url_for('reservations_page') }}">Ver mis reservas</a>
-    <a href="{{ url_for('index') }}">Volver a la cartelera</a>
+    <a class="button-secondary-light" href="{{ url_for('index') }}">Volver a la cartelera</a>
   </p>
 </div>
 {% endblock %}

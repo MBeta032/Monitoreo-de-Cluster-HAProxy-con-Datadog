@@ -165,3 +165,22 @@ def test_internal_next_is_accepted(url):
 ])
 def test_external_next_is_rejected(url):
     assert not auth.is_safe_next(url)
+
+
+# Páginas de error: las páginas web tienen el estilo del sitio; la API responde JSON
+
+def test_unknown_page_shows_styled_404_with_link_to_listing(client):
+    response = client.get("/no-existe")
+
+    assert response.status_code == 404
+    assert response.mimetype == "text/html"
+    page = response.get_data(as_text=True)
+    assert "Taquilla Sucursal" in page
+    assert "Volver a la cartelera" in page
+
+
+def test_unknown_api_route_returns_json_404(client):
+    response = client.get("/api/no-existe")
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "Not Found"

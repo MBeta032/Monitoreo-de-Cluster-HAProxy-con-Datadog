@@ -3,7 +3,7 @@
 
 const seatIdInput = document.getElementById("selected-seat-id");
 const continueButton = document.getElementById("continue-button");
-const buyBarSeat = document.getElementById("buy-bar-seat");
+const bottomBarSeat = document.getElementById("bottom-bar-seat");
 const selectionSection = document.getElementById("selection-section");
 const selectionRow = document.getElementById("selection-row");
 const selectionNumber = document.getElementById("selection-number");
@@ -27,7 +27,7 @@ document.querySelectorAll(".seat-map .seat.available").forEach(function (seatBut
     selectionSection.textContent = section;
     selectionRow.textContent = rowName;
     selectionNumber.textContent = number;
-    buyBarSeat.textContent = section + " · Fila " + rowName + " · Silla " + number;
+    bottomBarSeat.textContent = section + " · Fila " + rowName + " · Silla " + number;
 
     seatIdInput.value = seatButton.dataset.seatId;
     continueButton.disabled = false;

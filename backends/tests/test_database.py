@@ -102,3 +102,16 @@ def test_api_seats_can_be_filtered_by_section(client, database):
     assert len(seats) == 500
     assert all(seat["section"] == "Gradería Central" for seat in seats)
     assert len(client.get(f"/api/events/{CONCERT_ID}/seats").get_json()) == 2000
+
+
+def test_listing_shows_last_seats_when_less_than_10_percent(client, database, test_pool):
+    # Se ocupan 95 de las 100 sillas de la obra de teatro: quedan 5 (menos del 10 %)
+    with test_pool.connection() as conn:
+        conn.execute(
+            "UPDATE seats SET status = 'reserved' WHERE event_id = %s AND id <= 2095",
+            (THEATER_ID,),
+        )
+
+    page = client.get("/").get_data(as_text=True)
+
+    assert "Últimas 5 sillas" in page

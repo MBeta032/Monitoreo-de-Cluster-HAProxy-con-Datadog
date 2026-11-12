@@ -1,46 +1,68 @@
 {% extends "base.html" %}
 
-{% block title %}{% if mode == "login" %}Iniciar sesión{% else %}Crear cuenta{% endif %} - Boletería Cali{% endblock %}
+{% block title %}{% if mode == "login" %}Iniciar sesión{% else %}Crear cuenta{% endif %}{% endblock %}
 
 {% block content %}
-<div class="auth-box card">
-  {# Pestañas: son dos rutas distintas (/login y /register) que conservan el parámetro next #}
-  <nav class="auth-tabs">
-    <a href="{{ url_for('login', next=next_url) }}" class="{% if mode == 'login' %}active{% endif %}">Iniciar sesión</a>
-    <a href="{{ url_for('register', next=next_url) }}" class="{% if mode == 'register' %}active{% endif %}">Crear cuenta</a>
-  </nav>
+{% if reserving_seat %}
+<p class="back-link auth-back">
+  <a href="{{ url_for('event_page', event_id=reserving_seat.event_id, section=reserving_seat.section) }}">← Volver a las sillas</a>
+</p>
+{% endif %}
 
-  {% if error_message %}
-  <p class="message error" role="alert">{{ error_message }}</p>
+<div class="auth-layout">
+  {# Recuadro oscuro: qué silla se está reservando (solo si se viene de la página Confirmar) #}
+  {% if reserving_seat %}
+  <section class="reserving-box">
+    <p class="reserving-label">ESTÁS RESERVANDO</p>
+    <h1 class="reserving-event">{{ reserving_seat.event_name }}</h1>
+    <p>{{ reserving_seat.venue }} · {{ reserving_seat.starts_at.strftime("%d/%m/%Y · %H:%M") }} h</p>
+    <p class="reserving-seat">{{ reserving_seat.section }} · Fila {{ reserving_seat.seat_row }} · Silla {{ reserving_seat.seat_number }}</p>
+  </section>
   {% endif %}
 
-  {% if mode == "login" %}
-  <form method="post" action="{{ url_for('login') }}" class="auth-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="next" value="{{ next_url }}">
-    <label>Correo
-      <input type="email" name="email" value="{{ email or '' }}" maxlength="254" required autocomplete="email">
-    </label>
-    <label>Contraseña
-      <input type="password" name="password" required autocomplete="current-password">
-    </label>
-    <button type="submit" class="button-primary">Iniciar sesión y continuar</button>
-  </form>
-  {% else %}
-  <form method="post" action="{{ url_for('register') }}" class="auth-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="next" value="{{ next_url }}">
-    <label>Nombre
-      <input type="text" name="name" value="{{ name or '' }}" maxlength="100" required autocomplete="name">
-    </label>
-    <label>Correo
-      <input type="email" name="email" value="{{ email or '' }}" maxlength="254" required autocomplete="email">
-    </label>
-    <label>Contraseña (mínimo 8 caracteres)
-      <input type="password" name="password" minlength="8" required autocomplete="new-password">
-    </label>
-    <button type="submit" class="button-primary">Crear cuenta y continuar</button>
-  </form>
-  {% endif %}
+  <section class="card auth-card">
+    {# Pestañas: son dos rutas distintas (/login y /register) que conservan next, el evento y la silla #}
+    {% set keep_args = {"next": next_url} %}
+    {% if reserving_seat %}
+    {% set keep_args = {"next": next_url, "event": reserving_seat.event_id, "seat": reserving_seat.id} %}
+    {% endif %}
+    <nav class="auth-tabs">
+      <a href="{{ url_for('login', **keep_args) }}" class="{% if mode == 'login' %}active{% endif %}">Iniciar sesión</a>
+      <a href="{{ url_for('register', **keep_args) }}" class="{% if mode == 'register' %}active{% endif %}">Crear cuenta</a>
+    </nav>
+
+    {% if error_message %}
+    <p class="notice-error" role="alert">{{ error_message }}</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('login' if mode == 'login' else 'register') }}" class="form-stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      {% if reserving_seat %}
+      <input type="hidden" name="event" value="{{ reserving_seat.event_id }}">
+      <input type="hidden" name="seat" value="{{ reserving_seat.id }}">
+      {% endif %}
+
+      {% if mode == "register" %}
+      <label>Nombre
+        <input type="text" name="name" value="{{ name or '' }}" maxlength="100" required autocomplete="name">
+      </label>
+      {% endif %}
+      <label>Correo
+        <input type="email" name="email" value="{{ email or '' }}" maxlength="254" required autocomplete="email">
+      </label>
+      {% if mode == "login" %}
+      <label>Contraseña
+        <input type="password" name="password" required autocomplete="current-password">
+      </label>
+      <button type="submit" class="button-primary">Iniciar sesión y continuar</button>
+      {% else %}
+      <label>Contraseña (mínimo 8 caracteres)
+        <input type="password" name="password" minlength="8" required autocomplete="new-password">
+      </label>
+      <button type="submit" class="button-primary">Crear cuenta y continuar</button>
+      {% endif %}
+    </form>
+  </section>
 </div>
 {% endblock %}

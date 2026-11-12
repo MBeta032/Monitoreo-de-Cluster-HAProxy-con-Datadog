@@ -1,21 +1,25 @@
 {% extends "base.html" %}
-{% set current_step = 1 %}
+{% from "steps.html" import steps_bar %}
 
-{% block title %}{{ event.name }} - Boletería Cali{% endblock %}
-{% block body_class %}has-buy-bar{% endblock %}
+{% block title %}{{ event.name }}{% endblock %}
+{% block body_class %}has-bottom-bar{% endblock %}
 
 {% block content %}
+{% set map_url = url_for('event_page', event_id=event.id) %}
 {% if has_many_sections %}
-<p><a href="{{ url_for('event_page', event_id=event.id) }}">← Cambiar zona</a></p>
+<p class="back-link"><a href="{{ map_url }}">← Cambiar zona</a></p>
 {% else %}
-<p><a href="{{ url_for('index') }}">← Volver a la cartelera</a></p>
+<p class="back-link"><a href="{{ url_for('index') }}">← Volver a la cartelera</a></p>
 {% endif %}
+{{ steps_bar(1) }}
 
 <div class="event-layout">
 
   <!-- Columna izquierda: evento y silla elegida -->
-  <aside class="event-sidebar">
-    <section class="card">
+  <aside>
+    <section class="card event-summary">
+      <div class="color-band {{ event.category | category_class }}"></div>
+      <p class="event-category">{{ event.category }}</p>
       <h1 class="event-title">{{ event.name }}</h1>
       <p class="event-detail">{{ event.venue }}</p>
       <p class="event-detail">{{ event.starts_at.strftime("%d/%m/%Y") }} · {{ event.starts_at.strftime("%H:%M") }} h</p>
@@ -32,12 +36,12 @@
   </aside>
 
   <!-- Columna derecha: leyenda, escenario y sillas de la zona -->
-  <section class="seat-panel">
+  <section class="card seat-panel">
     <h2 class="section-name">{{ section.section }} · Quedan {{ section.available_seats }} de {{ section.total_seats }}</h2>
     <p class="legend">
-      <span class="legend-item"><span class="seat available"></span> Libre</span>
-      <span class="legend-item"><span class="seat selected"></span> Seleccionada</span>
-      <span class="legend-item"><span class="seat reserved"></span> Ocupada</span>
+      <span class="legend-item"><span class="seat available" aria-hidden="true"></span> Libre</span>
+      <span class="legend-item"><span class="seat selected" aria-hidden="true"></span> Seleccionada</span>
+      <span class="legend-item"><span class="seat reserved" aria-hidden="true"></span> Ocupada</span>
     </p>
 
     <div class="stage">ESCENARIO</div>
@@ -51,7 +55,7 @@
           <span class="row-label">{{ row }}</span>
           {% for seat in row_seats %}
           {% if loop.index0 == aisle_position %}<span class="aisle"></span>{% endif %}
-          <button type="button" class="seat {{ seat.status }}" data-seat-id="{{ seat.id }}" {% if seat.status != "available" %}disabled{% endif %}><span class="seat-number">{{ seat.seat_number }}</span></button>
+          <button type="button" class="seat {{ seat.status }}" data-seat-id="{{ seat.id }}" aria-label="Fila {{ row }}, silla {{ seat.seat_number }}" {% if seat.status != "available" %}disabled{% endif %}><span class="seat-number">{{ seat.seat_number }}</span></button>
           {% endfor %}
           <span class="row-label">{{ row }}</span>
         </div>
@@ -61,15 +65,20 @@
   </section>
 </div>
 
-<!-- Barra fija de abajo: silla elegida y "Continuar", que lleva a la página Confirmar -->
-<form class="buy-bar" method="get" action="{{ url_for('confirm_page', event_id=event.id) }}">
-  <div class="buy-bar-content">
-    <div class="buy-bar-seat">
-      <span class="muted">Silla seleccionada</span>
-      <strong id="buy-bar-seat">Ninguna</strong>
+<!-- Barra fija de abajo: silla elegida, cambiar zona y "Continuar" (lleva a la página Confirmar) -->
+<form class="bottom-bar" method="get" action="{{ url_for('confirm_page', event_id=event.id) }}">
+  <div class="bottom-bar-content">
+    <p class="bottom-bar-seat">
+      <span class="muted">Silla seleccionada:</span>
+      <strong id="bottom-bar-seat">Ninguna</strong>
+    </p>
+    <div class="bottom-bar-actions">
+      {% if has_many_sections %}
+      <a href="{{ map_url }}">Cambiar zona</a>
+      {% endif %}
+      <input type="hidden" name="seat" id="selected-seat-id">
+      <button type="submit" id="continue-button" class="button-primary" disabled>Continuar →</button>
     </div>
-    <input type="hidden" name="seat" id="selected-seat-id">
-    <button type="submit" id="continue-button" class="button-primary" disabled>Continuar →</button>
   </div>
 </form>
 {% endblock %}

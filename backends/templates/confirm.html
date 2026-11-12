@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% set current_step = 2 %}
+{% from "steps.html" import steps_bar %}
 
-{% block title %}Confirmar reserva - Boletería Cali{% endblock %}
+{% block title %}Confirmar reserva{% endblock %}
 
 {% block content %}
 {% set seats_url = url_for('event_page', event_id=seat.event_id, section=seat.section) %}
-<p><a href="{{ seats_url }}">← Cambiar silla</a></p>
+<p class="back-link"><a href="{{ seats_url }}">← Cambiar silla</a></p>
+{{ steps_bar(2) }}
 <h1 class="page-title">Revisa tu reserva</h1>
 
 {% if seat_taken %}
@@ -16,8 +17,10 @@
 {% endif %}
 
 <div class="confirm-layout">
-  <section class="card">
-    <h2>{{ seat.event_name }}</h2>
+  <section class="card summary-card">
+    <div class="color-band {{ seat.category | category_class }}"></div>
+    <p class="event-category">{{ seat.category }}</p>
+    <h2 class="event-name">{{ seat.event_name }}</h2>
     <dl class="summary-list">
       <div><dt>Fecha y hora</dt><dd>{{ seat.starts_at.strftime("%d/%m/%Y · %H:%M") }} h</dd></div>
       <div><dt>Lugar</dt><dd>{{ seat.venue }}</dd></div>
@@ -28,16 +31,16 @@
     </dl>
   </section>
 
-  <section class="card">
-    <p>La silla se aparta a tu nombre solo cuando confirmas. No hay pagos: es una reserva.</p>
+  <aside class="card">
+    <p>La silla se aparta a tu nombre solo cuando confirmas. Es una reserva: no hay pagos.</p>
     {% if not seat_taken %}
     <form method="post" action="{{ url_for('confirm_reservation', event_id=seat.event_id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="seat_id" value="{{ seat.id }}">
-      <button type="submit" class="button-primary">Confirmar reserva</button>
+      <button type="submit" class="button-primary button-wide">Confirmar reserva</button>
     </form>
     {% endif %}
-    <p><a href="{{ seats_url }}">Cambiar silla</a></p>
-  </section>
+    <p class="centered"><a href="{{ seats_url }}">Cambiar silla</a></p>
+  </aside>
 </div>
 {% endblock %}

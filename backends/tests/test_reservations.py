@@ -151,3 +151,18 @@ def test_empty_reservations_page(client, database):
     page = client.get("/reservations").get_data(as_text=True)
 
     assert "Aún no tienes reservas" in page
+
+
+def test_login_page_shows_the_seat_being_reserved(client, database):
+    # Al ir a Confirmar sin sesión, se pasa por el inicio de sesión con el evento y la silla
+    redirect_response = client.get(f"/events/{CONCERT_ID}/confirm?seat=5")
+    login_url = redirect_response.headers["Location"]
+    assert "event=1" in login_url
+    assert "seat=5" in login_url
+
+    page = client.get(login_url).get_data(as_text=True)
+
+    assert "ESTÁS RESERVANDO" in page
+    assert "Concierto Caña y Clave" in page
+    assert "Platea · Fila A · Silla 5" in page
+    assert "Volver a las sillas" in page
