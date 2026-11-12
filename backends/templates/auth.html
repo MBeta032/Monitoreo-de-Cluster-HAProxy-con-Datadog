@@ -3,11 +3,16 @@
 {% block title %}{% if mode == "login" %}Iniciar sesión{% else %}Crear cuenta{% endif %}{% endblock %}
 
 {% block content %}
-{% if reserving_seat %}
+{# Enlace de volver: a las sillas si se viene de una reserva; si no, a la página de next #}
 <p class="back-link auth-back">
+  {% if reserving_seat %}
   <a href="{{ url_for('event_page', event_id=reserving_seat.event_id, section=reserving_seat.section) }}">← Volver a las sillas</a>
+  {% elif next_url == url_for('index') %}
+  <a href="{{ next_url }}">← Volver a la cartelera</a>
+  {% else %}
+  <a href="{{ next_url }}">← Volver</a>
+  {% endif %}
 </p>
-{% endif %}
 
 <div class="auth-layout">
   {# Recuadro oscuro: qué silla se está reservando (solo si se viene de la página Confirmar) #}

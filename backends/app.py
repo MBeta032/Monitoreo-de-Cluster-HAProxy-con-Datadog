@@ -128,7 +128,19 @@ def inject_common_values():
         "instance_name": INSTANCE_NAME,
         "current_user": auth.get_current_user(),
         "csrf_token": auth.get_csrf_token,
+        "header_login_url": get_header_login_url(),
     }
+
+def get_header_login_url():
+    # Botón "Iniciar sesión" del encabezado: después de iniciar sesión se vuelve a la página
+    # actual (va en next). En /login y /register no se agrega next: ya se está ahí.
+    if request.endpoint in ("login", "register"):
+        return url_for("login")
+    if request.query_string:
+        current_page = request.full_path
+    else:
+        current_page = request.path
+    return url_for("login", next=current_page)
 
 def reservation_code(reservation_id):
     # Código que ve el usuario: "TS-" más el id con 6 dígitos (TS-000482)
@@ -164,8 +176,12 @@ def month_short(date):
     return MONTH_NAMES[date.month - 1]
 
 def initials(name):
-    # Iniciales para el encabezado: "Prueba 001" -> "P0", "Ana Pérez" -> "AP"
-    words = name.split()
+    # Iniciales para el encabezado, solo con las palabras que empiezan con letra:
+    # "Ana Pérez" -> "AP", "Prueba 001" -> "P"
+    words = []
+    for word in name.split():
+        if word[0].isalpha():
+            words.append(word)
     return "".join(word[0] for word in words[:2]).upper()
 
 # Filtros para las plantillas, por ejemplo {{ reservation.id | reservation_code }}

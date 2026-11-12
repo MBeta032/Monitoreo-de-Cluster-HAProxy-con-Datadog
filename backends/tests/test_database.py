@@ -115,3 +115,29 @@ def test_listing_shows_last_seats_when_less_than_10_percent(client, database, te
     page = client.get("/").get_data(as_text=True)
 
     assert "Últimas 5 sillas" in page
+
+
+def test_sold_out_event_shows_notice_without_bottom_bar(client, database):
+    page = client.get(f"/events/{SOLD_OUT_EVENT_ID}").get_data(as_text=True)
+
+    assert "Este evento está agotado" in page
+    assert "Volver a la cartelera" in page
+    # Sin sillas libres no hay barra de abajo ni botón "Continuar"
+    assert 'class="bottom-bar"' not in page
+    assert "Continuar →" not in page
+
+
+def test_sold_out_event_shows_notice_in_zone_map(client, database, test_pool):
+    # Se ocupan todas las sillas del concierto directamente en la base de prueba
+    with test_pool.connection() as conn:
+        conn.execute("UPDATE seats SET status = 'reserved' WHERE event_id = %s", (CONCERT_ID,))
+
+    page = client.get(f"/events/{CONCERT_ID}").get_data(as_text=True)
+
+    assert "Este evento está agotado" in page
+
+
+def test_header_login_link_returns_to_current_page(client, database):
+    page = client.get(f"/events/{CONCERT_ID}").get_data(as_text=True)
+
+    assert f'href="/login?next=/events/{CONCERT_ID}"' in page

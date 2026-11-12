@@ -9,6 +9,10 @@
 <p class="event-detail">{{ event.venue }} · {{ event.starts_at.strftime("%d/%m/%Y") }} · {{ event.starts_at.strftime("%H:%M") }} h</p>
 {{ steps_bar(1) }}
 
+{% if event.available_seats == 0 %}
+{% include "sold_out_notice.html" %}
+{% endif %}
+
 <div class="map-layout">
   <!-- Plano de la arena: escenario arriba y las zonas donde estarían -->
   <section class="card">

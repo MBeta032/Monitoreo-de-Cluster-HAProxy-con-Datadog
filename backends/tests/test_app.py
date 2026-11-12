@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+import app as backend_app
 import auth
 import db
 
@@ -184,3 +185,32 @@ def test_unknown_api_route_returns_json_404(client):
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "Not Found"
+
+
+@pytest.mark.parametrize("name, expected", [
+    ("Ana Pérez", "AP"),
+    ("Prueba 001", "P"),
+    ("ana maría gómez", "AM"),
+])
+def test_initials_use_only_words_that_start_with_a_letter(name, expected):
+    assert backend_app.initials(name) == expected
+
+
+# Enlaces de volver e "Iniciar sesión" (no necesitan base de datos sin sesión)
+
+def test_login_page_has_back_link_to_listing(client):
+    page = client.get("/login").get_data(as_text=True)
+
+    assert '<a href="/">← Volver a la cartelera</a>' in page
+
+
+def test_login_page_back_link_goes_to_next(client):
+    page = client.get("/login?next=/events/2").get_data(as_text=True)
+
+    assert '<a href="/events/2">← Volver</a>' in page
+
+
+def test_header_login_link_has_no_next_on_login_page(client):
+    page = client.get("/login").get_data(as_text=True)
+
+    assert 'class="button-secondary" href="/login"' in page

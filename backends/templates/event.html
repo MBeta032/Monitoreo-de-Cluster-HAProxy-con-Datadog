@@ -2,7 +2,8 @@
 {% from "steps.html" import steps_bar %}
 
 {% block title %}{{ event.name }}{% endblock %}
-{% block body_class %}has-bottom-bar{% endblock %}
+{# Evento agotado: no hay barra de abajo (no hay silla que elegir) #}
+{% block body_class %}{% if event.available_seats > 0 %}has-bottom-bar{% endif %}{% endblock %}
 
 {% block content %}
 {% set map_url = url_for('event_page', event_id=event.id) %}
@@ -12,6 +13,10 @@
 <p class="back-link"><a href="{{ url_for('index') }}">← Volver a la cartelera</a></p>
 {% endif %}
 {{ steps_bar(1) }}
+
+{% if event.available_seats == 0 %}
+{% include "sold_out_notice.html" %}
+{% endif %}
 
 <div class="event-layout">
 
@@ -65,6 +70,7 @@
   </section>
 </div>
 
+{% if event.available_seats > 0 %}
 <!-- Barra fija de abajo: silla elegida, cambiar zona y "Continuar" (lleva a la página Confirmar) -->
 <form class="bottom-bar" method="get" action="{{ url_for('confirm_page', event_id=event.id) }}">
   <div class="bottom-bar-content">
@@ -81,8 +87,11 @@
     </div>
   </div>
 </form>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
+{% if event.available_seats > 0 %}
 <script src="{{ url_for('static', filename='seat_picker.js') }}"></script>
+{% endif %}
 {% endblock %}

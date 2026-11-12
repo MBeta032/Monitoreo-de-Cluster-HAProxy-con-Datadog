@@ -292,6 +292,26 @@ h1, h2, h3 {
   color: var(--color-error-text);
 }
 
+/* Aviso de evento agotado (plano y sillas) */
+.sold-out-notice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  background: var(--color-error-bg);
+}
+
+.sold-out-text {
+  margin: 6px 0 0;
+  color: var(--color-error-text);
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
 /* --- Tarjetas y datos del evento --- */
 
 .card {
