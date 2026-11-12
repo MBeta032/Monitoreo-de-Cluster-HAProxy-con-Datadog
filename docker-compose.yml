@@ -51,6 +51,9 @@ services:
         condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend1"}]'
+      # Métricas de /metrics por Autodiscovery (antes: datadog/conf.d/openmetrics.d/conf.yaml).
+      # El JSON va entre comillas simples para que YAML lo deje como texto.
+      com.datadoghq.ad.checks: '{"openmetrics": {"instances": [{"openmetrics_endpoint": "http://backend1:5000/metrics", "namespace": "backend", "metrics": ["http_requests", "http_request_duration_seconds"], "tags": ["backend:backend1"]}]}}'
     networks:
       - cluster-net
     deploy:
@@ -81,6 +84,7 @@ services:
         condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend2"}]'
+      com.datadoghq.ad.checks: '{"openmetrics": {"instances": [{"openmetrics_endpoint": "http://backend2:5000/metrics", "namespace": "backend", "metrics": ["http_requests", "http_request_duration_seconds"], "tags": ["backend:backend2"]}]}}'
     networks:
       - cluster-net
     deploy:
@@ -111,6 +115,7 @@ services:
         condition: service_healthy
     labels:
       com.datadoghq.ad.logs: '[{"source":"python","service":"backend3"}]'
+      com.datadoghq.ad.checks: '{"openmetrics": {"instances": [{"openmetrics_endpoint": "http://backend3:5000/metrics", "namespace": "backend", "metrics": ["http_requests", "http_request_duration_seconds"], "tags": ["backend:backend3"]}]}}'
     networks:
       - cluster-net
     deploy:
@@ -183,7 +188,6 @@ services:
       - ./datadog/datadog.yaml:/etc/datadog-agent/datadog.yaml:ro
       - ./datadog/conf.d/haproxy.d/conf.yaml:/etc/datadog-agent/conf.d/haproxy.d/conf.yaml:ro
       - ./datadog/conf.d/http_check.d/conf.yaml:/etc/datadog-agent/conf.d/http_check.d/conf.yaml:ro
-      - ./datadog/conf.d/openmetrics.d/conf.yaml:/etc/datadog-agent/conf.d/openmetrics.d/conf.yaml:ro
     networks:
       - cluster-net
 
