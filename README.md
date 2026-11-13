@@ -596,55 +596,83 @@ En Datadog: **Metrics Explorer** (`postgresql.connections`, `network.http.respon
 
 <sub>👤 Responsable: Alan Basante</sub>
 
-- **Acceso directo:** [Ver Dashboard en Datadog (Enlace público)](https://p.datadoghq.com/sb/95a7b1a2-d9f8-11f1-b57e-baea63f7b3d6-092a4c169f18801ad9dc43ee02fcb845)
+El dashboard muestra en una sola página cómo está la Taquilla (estado, tráfico, tiempos, errores, base de datos) y los monitores (reglas que vigilan una métrica y avisan por correo) alertan cuando algo falla. Todo está versionado en JSON en el repo y se importa a Datadog.
 
-Se implementó la capa de observabilidad visual y alertas tempranas en Datadog para supervisar en tiempo real la salud, el rendimiento y la disponibilidad del clúster HAProxy. Todas las definiciones se gestionan bajo el principio de **Observabilidad como Código (OaC)** mediante archivos JSON versionados en el repositorio, permitiendo un despliegue reproducible.
+- **Dashboard:** "Cluster HAProxy - Monitoreo y Rendimiento", id `nne-fkp-w5z`. [Enlace público](https://p.datadoghq.com/sb/95a7b1a2-d9f8-11f1-b57e-baea63f7b3d6-ccacbd422eed735a402e91352d62c6ba) (se ve sin cuenta de Datadog).
+- El dashboard anterior (`t7r-zhp-rsx`) era de tipo `free` y Datadog no permite convertirlo a `ordered` al importar; por eso se creó uno nuevo y el viejo quedó archivado.
+- Archivos: [`datadog/dashboards/haproxy_cluster_dashboard.json`](datadog/dashboards/haproxy_cluster_dashboard.json) y la carpeta [`datadog/monitors/`](datadog/monitors/).
 
-### 8.1 Indicadores del Dashboard
-El dashboard centraliza los 4 indicadores obligatorios del clúster en una vista organizada ([`datadog/dashboards/haproxy_cluster_dashboard.json`](file:///c:/Users/Alanp/Desktop/GIT-HUB/Monitoreo-de-Cluster-HAProxy-con-Datadog/datadog/dashboards/haproxy_cluster_dashboard.json)):
+### 8.1 Qué muestra el dashboard
 
-1. **Peticiones por segundo (Throughput):**
-   - **Métrica:** `sum:haproxy.frontend.requests.rate{project:haproxy-telematicos}`
-   - **Tipo de widget:** Gráfico temporal (`timeseries`).
-   - **Propósito:** Medir el caudal de solicitudes por segundo procesadas por el frontend `fe_web`.
-2. **Latencia promedio de respuesta:**
-   - **Métrica:** `avg:haproxy.backend.response.time{project:haproxy-telematicos}`
-   - **Tipo de widget:** Gráfico temporal (`timeseries`).
-   - **Propósito:** Supervisar el tiempo de respuesta (en ms) que toma el clúster `be_app` para despachar cada petición.
-3. **Disponibilidad y salud de backends:**
-   - **Check:** `haproxy.backend_up` agrupado por `server` y `backend`.
-   - **Tipo de widget:** Estado de chequeo de servicio (`check_status`).
-   - **Propósito:** Visualizar en tiempo real el semáforo operativo individual de `backend1`, `backend2` y `backend3`.
-4. **Tasa de error HTTP (%):**
-   - **Cálculo:** Ratio porcentual de respuestas 5xx frente al tráfico total atendido:
-     $$\text{Error Rate (\%)} = \left( \frac{\sum \text{haproxy.backend.response.5xx}}{\sum \text{haproxy.frontend.requests.rate}} \right) \times 100$$
-   - **Tipo de widget:** Valor numérico (`query_value`) con formato condicional: verde ($< 2\%$), advertencia preventiva en amarillo ($2\% - 5\%$) y crítico en rojo ($> 5\%$).
+Arriba hay un filtro `backend` (variable de plantilla: escoge `backend1`, `backend2`, `backend3` o todos). Cada grupo trae una nota corta que lo explica.
 
-### 8.2 Monitores y Alertas
-Se configuraron dos reglas de supervisión continua para notificar anomalías operativas:
+| Grupo | Qué muestra |
+|---|---|
+| 1. Estado | Semáforo de cada backend y del grupo `be_app` (`haproxy.backend_up`), luz del cliente misterioso ([7.6](#76-cliente-misterioso-http_check)) y tasa de error 5xx: verde < 2 %, amarillo ≥ 2 %, rojo ≥ 5 % |
+| 2. Tráfico | Peticiones por segundo en HAProxy (solo `fe_web`, sin la página de estadísticas) y por backend |
+| 3. Tiempo de espera | Promedio y máximo; p50, p95 y p99 desde los logs de HAProxy (`@total_ms`); tiempo promedio por trámite (`handler`), por ejemplo `/api/login` contra reservar |
+| 4. Errores en el tiempo | % de 5xx con líneas en 2 % y 5 %; 4xx con el 409 (silla ya reservada) aparte |
+| 5. Saturación | CPU (núcleos) y memoria (MB) de cada backend, con el límite de 1 CPU y 384 MB |
+| 6. Reparto de HAProxy | Peticiones, conexiones activas y cola por servidor (para comparar algoritmos de balanceo) |
+| 7. Base de datos | % de conexiones, commits por segundo, bloqueos por tabla, sillas reservadas por segundo y lista de consultas lentas (`service:db`) |
 
-| Monitor | Tipo | Condición de disparo | Archivo |
-|---|:---:|---|---|
-| **Caída de Backend** | `service check` | Se activa de forma inmediata si un servidor pasa a estado `CRITICAL` en 1 chequeo consecutivo. | [`datadog/monitors/backend_down_monitor.json`](file:///c:/Users/Alanp/Desktop/GIT-HUB/Monitoreo-de-Cluster-HAProxy-con-Datadog/datadog/monitors/backend_down_monitor.json) |
-| **Tasa de Error HTTP** | `metric alert` | Evalúa el porcentaje de errores 5xx en una ventana de 5 minutos: aviso si supera el 2%, alerta crítica si supera el 5%. | [`datadog/monitors/high_error_rate_monitor.json`](file:///c:/Users/Alanp/Desktop/GIT-HUB/Monitoreo-de-Cluster-HAProxy-con-Datadog/datadog/monitors/high_error_rate_monitor.json) |
+- **Sin contar doble:** HAProxy envía una fila por servidor y una del grupo, que es la suma ([7.3](#73-integración-con-haproxy)). Las gráficas por servidor excluyen la fila del grupo (`!backend:backend`).
+- **Tasa de error:** respuestas 5xx por segundo ÷ peticiones por segundo × 100, las dos sacadas de contadores de HAProxy (no de la foto del último segundo, que con poco tráfico casi siempre da 0).
 
-Ambos monitores incorporan notificaciones contextualizadas con variables dinámicas (`{{server.name}}`, `{{value}}%`) y mensajes diferenciados para alerta (`{{#is_alert}}`) y recuperación automática (`{{#is_recovery}}`).
+### 8.2 Guía de alertas
 
-### 8.3 Justificación técnica y selección de alternativas (Rúbrica)
-Para satisfacer los criterios de diseño y evaluación del proyecto se sustentaron las siguientes decisiones de ingeniería:
-- **Detección de caídas (Service Check vs Alerta de métrica):** Se seleccionó un `service check` nativo de HAProxy en lugar de una métrica acumulada. El service check evalúa el sondeo en intervalos de 1 segundo, detectando la caída de un contenedor en tiempo real sin el retraso que genera el cálculo de una ventana móvil.
-- **Tasa de errores (Ventana ponderada vs Umbral instantáneo):** Se adoptó una ventana temporal de 5 minutos (`avg(last_5m)`) con doble umbral (Warning 2%, Critical 5%). Esto previene falsos positivos por fallas transitorias en momentos de poco tráfico y asegura alineación con estándares de confiabilidad (SLO).
-- **Aprovisionamiento declarativo:** Mantener las definiciones en archivos JSON permite validar la configuración localmente, versionar cambios en Git y desplegar dashboards y monitores mediante la API de Datadog sin depender de modificaciones manuales efímeras.
+Los 3 monitores avisan a `@team-haproxy-telematicos`: un Team de Datadog con un canal de correo. Los correos están en Datadog, no en el repo. Cada mensaje dice qué pasó, qué pieza falló, el primer paso a revisar y el enlace al dashboard.
 
-### 8.4 Importación de configuraciones en Datadog
-Para replicar esta infraestructura en cualquier cuenta de Datadog:
-- **Dashboard:** En Datadog, acceder a **Dashboards → New Dashboard**, seleccionar el menú de opciones (tres puntos) en la esquina superior derecha, elegir **Import JSON** y cargar `datadog/dashboards/haproxy_cluster_dashboard.json`.
-- **Monitores:** En **Monitors → New Monitor**, crear un monitor del tipo correspondiente, seleccionar **Edit as JSON** en la parte superior del formulario y pegar el contenido de los archivos en `datadog/monitors/`.
+| Monitor (id) | Qué vigila | Cuándo suena | Qué hacer primero |
+|---|---|---|---|
+| Caída de servidor backend (`342430447`) | `haproxy.backend_up` de cada backend | 2 lecturas seguidas en CRITICAL (se recupera con 1 OK) | `docker compose ps <backend>` y `docker compose logs <backend> --tail 50` |
+| Tasa elevada de errores 5xx (`342430701`) | % de 5xx del grupo `be_app` | Promedio de 5 min > 2 % (aviso) o > 5 % (alerta) | Grupo "Errores" del dashboard y Log Explorer `service:haproxy @status_code:>=500`; si todo es 503, revisar `db` |
+| No se puede reservar (`344613789`) | `http.can_connect` del cliente misterioso | 2 chequeos seguidos fallidos (se recupera con 1 OK) | `docker compose ps db` y `docker compose logs db --tail 50` |
 
-### 8.5 Evidencias requeridas para el informe
-Para el informe IEEE y la sustentación se acotan estrictamente **dos capturas clave**:
-1. **Captura 1 (Dashboard general en régimen):** Vista completa del panel con tráfico activo de Artillery donde se evidencie el funcionamiento coordinado de los 4 widgets en condiciones normales.
-2. **Captura 2 (Alerta activa ante fallo):** Vista del monitor en Datadog en estado `CRITICAL` tras simular la detención de un backend (`docker compose stop backend2`).
+Por qué esos valores:
+- **2 lecturas seguidas** en la caída: el Agent lee HAProxy cada 5 s; con 1 sola lectura podría sonar por una lectura mala aislada (por ejemplo, mientras el Agent se reinicia).
+- **5 minutos y 2 % / 5 %** en la tasa de error: la ventana suaviza los picos de un segundo. `evaluation_delay: 60` (espera 60 s antes de evaluar) evita calcular con el último minuto todavía incompleto. Sin tráfico no hay datos y no avisa.
+- **2 chequeos seguidos** en "No se puede reservar": unos 30 s sin poder ver la cartelera; uno solo puede ser un pico pasajero.
+
+### 8.3 Tiempos de detección
+
+| Falla | Se ve en el dashboard | Suena el monitor |
+|---|---|---|
+| Se cae un backend | 5 a 10 s (medido: HAProxy lo marca caído a los ~4 s y el Agent lee cada 5 s) | 10 a 15 s para tener 2 lecturas, más lo que tarde Datadog en evaluar y enviar el correo |
+| Se cae la base de datos | 15 a 30 s (el cliente misterioso pide cada 15 s y el backend tarda 5 s en dar el 503) | 30 a 45 s para tener 2 fallas, más la evaluación de Datadog |
+| Muchos errores 5xx | En el siguiente envío del Agent (~15 s) | De 1 a 6 min: promedio de 5 min más 60 s de espera (más rápido cuanto más alto el %) |
+
+Al volver la base de datos, el cliente misterioso tarda unos 15 a 30 s en pasar a OK, mientras los backends se reconectan.
+
+### 8.4 Cómo importar en Datadog
+
+**Dashboard** (sobre el existente, para no cambiar el enlace público):
+1. Abrir el dashboard `nne-fkp-w5z` (<https://app.datadoghq.com/dashboard/nne-fkp-w5z>).
+2. **Configure → Import dashboard JSON** y cargar `datadog/dashboards/haproxy_cluster_dashboard.json`.
+
+Debes ver: los 7 grupos, el filtro `backend` arriba y la misma URL. Nunca se importa en un dashboard nuevo: el enlace público cambiaría.
+
+**Team para los avisos** (una sola vez):
+1. Opcional: invitar a los integrantes como usuarios de Datadog (**Organization Settings → Users → Invite Users**); el canal de correo del Team basta para recibir los avisos.
+2. En <https://app.datadoghq.com/teams>: **New Team**, nombre `HAProxy Telemáticos`, handle `haproxy-telematicos` y los integrantes como miembros.
+3. En el Team: **engranaje (Settings) → Notifications → Add channel → Email** con los correos, y **Save**.
+
+**Monitores** (al editar no hay opción para pegar JSON; solo al crear uno nuevo):
+1. Para conservar el id, los existentes se editan en la interfaz: en **Monitors → Manage Monitors**, buscar el id (`342430447` o `342430701`) y **Edit**. Copiar del JSON del repo el alcance (scope), las condiciones (fallas seguidas y umbrales), el **Evaluation delay** en **Advanced options** y el mensaje; luego **Save and Publish**. Archivos: [`backend_down_monitor.json`](datadog/monitors/backend_down_monitor.json) y [`high_error_rate_monitor.json`](datadog/monitors/high_error_rate_monitor.json).
+2. Con **Export Monitor** se compara que lo guardado quedó igual al archivo del repo.
+3. Un monitor nuevo se crea con **Monitors → New Monitor → Import from JSON**. Así se creó `344613789` desde [`reservation_unavailable_monitor.json`](datadog/monitors/reservation_unavailable_monitor.json).
+
+Debes ver: en **Test Notifications** de cada monitor, el correo llega al Team.
+
+Monitores de ejemplo que se borraron a mano (no son del proyecto): los 7 de infraestructura que trae Datadog (CPU, disco, red, memoria y carga, con destinatarios de ejemplo como `@slack-infra` o `@pagerduty-...`), "Replication delay" de PostgreSQL (no hay réplicas) y el de conexiones de PostgreSQL (el pool es fijo: máximo 48 de 100 conexiones; ya se ve en el dashboard).
+
+### 8.5 Evidencias para el informe
+
+Dos capturas (no se suben al repo):
+1. **Dashboard con tráfico:** vista completa durante una prueba de Artillery, con peticiones por segundo y percentiles subiendo.
+2. **Alerta activa:** el monitor de caída en CRITICAL y el correo recibido tras `docker compose stop backend2`.
+
+---
 
 ## 9. Pruebas de carga
 
