@@ -512,7 +512,8 @@ El **Datadog Agent** (un programa que corre junto a los demás contenedores) rec
 
 - Lee el socket Unix `/var/lib/haproxy/admin.sock` con la versión heredada de la integración (`use_openmetrics: false`), que da el service check `haproxy.backend_up` (el que usa el monitor de backend caído).
 - Lee la planilla cada **5 s** (`min_collection_interval: 5`; por defecto son 15). Medido: HAProxy marca un backend `DOWN` unos 4 s después de detenerlo y el Agent lo recoge en su siguiente lectura, así que la caída se ve en Datadog en **unos 5 a 10 s**.
-- Cada lectura envía 94 métricas y 4 service checks (uno por backend y uno general).
+- `collect_aggregates_only: both`: envía las métricas del grupo `be_app` (`backend:backend`) **y** las de cada servidor (`backend:backend1` a `backend3`). La fila del grupo es la suma de los servidores, así que los totales filtran `backend:backend` y las vistas por servidor excluyen esa fila (`!backend:backend`); si no, se cuenta doble.
+- Cada lectura envía 166 métricas (antes 94, solo del grupo) y 4 service checks (uno por backend y uno general).
 
 ### 7.4 Métricas de los backends (OpenMetrics por Autodiscovery)
 
