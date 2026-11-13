@@ -1,8 +1,8 @@
 {
   "name": "[HAProxy] Caída de servidor backend detectada",
   "type": "service check",
-  "query": "\"haproxy.backend_up\".over(\"*\").by(\"backend\").last(1).count_by_status()",
-  "message": "{{#is_alert}}\n[CRÍTICO] El servidor {{backend.name}} no responde a las comprobaciones de salud (estado CRITICAL).\nHAProxy lo ha retirado de la rotación para proteger la disponibilidad del clúster be_app.\n\nAcción: Inspeccionar el contenedor afectado con `docker compose logs {{backend.name}}`.\n{{/is_alert}}\n{{#is_recovery}}\n[RECUPERADO] El servidor {{backend.name}} ha vuelto a responder correctamente (estado OK). HAProxy ha reanudado el enrutamiento de tráfico hacia este nodo.\n{{/is_recovery}}",
+  "query": "\"haproxy.backend_up\".over(\"haproxy_service:be_app\").by(\"backend\").last(2).count_by_status()",
+  "message": "{{#is_alert}}\n[CRÍTICO] HAProxy marcó {{backend.name}} como caído en 2 lecturas seguidas (unos 10 s) y dejó de enviarle tráfico.\nPieza afectada: {{backend.name}} (grupo be_app). Si dice \"backend\", se cayó el grupo completo.\nPrimer paso: `docker compose ps {{backend.name}}` y `docker compose logs {{backend.name}} --tail 50`.\n{{/is_alert}}\n{{#is_recovery}}\n[RECUPERADO] {{backend.name}} volvió a responder y HAProxy le envía tráfico otra vez.\n{{/is_recovery}}\nDashboard: https://app.datadoghq.com/dashboard/nne-fkp-w5z\n@team-haproxy-telematicos",
   "tags": [
     "env:lab",
     "project:haproxy-telematicos",
@@ -10,11 +10,12 @@
   ],
   "options": {
     "thresholds": {
-      "critical": 1,
-      "warning": 1,
+      "critical": 2,
+      "warning": 2,
       "ok": 1
     },
     "notify_no_data": false,
+    "renotify_interval": 0,
     "include_tags": true
   },
   "priority": 1

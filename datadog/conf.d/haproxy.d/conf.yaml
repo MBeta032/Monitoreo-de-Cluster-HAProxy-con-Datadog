@@ -7,6 +7,11 @@ instances:
     enable_service_check: true
     collect_status_metrics: true
     disable_legacy_service_tag: true
+    # "both": envía las métricas de cada servidor (backend1, backend2, backend3) y también
+    # las del grupo be_app. Con el valor por defecto (true) solo llegaban las del grupo.
+    # Para no contar doble: los totales usan backend:backend (fila del grupo) y las vistas
+    # por servidor excluyen esa fila (README, sección 8).
+    collect_aggregates_only: both
     # El Agent lee la planilla de HAProxy cada 5 s (por defecto son 15 s).
     # Así la caída de un backend se ve en Datadog en unos 5 a 10 s.
     min_collection_interval: 5
