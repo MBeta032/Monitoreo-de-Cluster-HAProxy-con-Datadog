@@ -507,6 +507,7 @@ El **Datadog Agent** (un programa que corre junto a los demás contenedores) rec
 | `openmetrics` (× 3) | `/metrics` de cada backend | Etiquetas de `backend1` a `backend3` en el compose | Cada 15 s |
 | `http_check` | El cliente misterioso ([7.6](#76-cliente-misterioso-http_check)) | `datadog/conf.d/http_check.d/conf.yaml` | Cada 15 s |
 | `postgres` | PostgreSQL ([7.7](#77-postgresql)) | Etiqueta del servicio `db` en el compose | Cada 15 s |
+| `dogstatsd` | Recibe las métricas y eventos que publica Artillery ([10.5](#105-artillery-con-datadog)) | Variable `DD_DOGSTATSD_NON_LOCAL_TRAFFIC` del servicio `datadog-agent` | Mientras corre una prueba |
 
 ### 7.3 Integración con HAProxy
 
@@ -589,6 +590,17 @@ docker compose start db
 Debes ver: con la base apagada, `http.can_connect` en `"status": 2` con `Expected 200, got 503`, y la página <http://localhost:8080> mostrando "Servicio no disponible".
 
 En Datadog: **Metrics Explorer** (`postgresql.connections`, `network.http.response_time`, `backend.http_requests.count`) y **Log Explorer** (`service:db`, `service:haproxy`).
+
+### 7.10 DogStatsD (métricas de Artillery)
+
+DogStatsD es el protocolo con el que un programa envía métricas al Agent por UDP (puerto 8125). Por defecto el Agent solo acepta esos paquetes del **propio contenedor**; Artillery corre en otro, así que el servicio `datadog-agent` define `DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"`. El puerto 8125 **no se publica** en el equipo anfitrión: solo lo ven los contenedores de `cluster-net`.
+
+```powershell
+docker compose exec -T datadog-agent agent status | Select-String "Metric Packets"
+docker run --rm --network cluster-net alpine sh -c "for i in 1 2 3 4 5; do echo 'prueba:1|c' | nc -u -w1 datadog-agent 8125; done"
+docker compose exec -T datadog-agent agent status | Select-String "Metric Packets"
+```
+Debes ver: `Metric Packets` sube en 5. Sin la variable no sube (medido: 0 de 5 paquetes).
 
 ---
 
@@ -683,6 +695,68 @@ Dos capturas (no se suben al repo):
 ## 10. Pruebas de punta a punta y simulación de caída
 
 <sub>👤 Responsable: Sharon Abella</sub>
+
+### 10.5 Artillery con Datadog
+
+Las pruebas de Artillery publican sus métricas y dos eventos (inicio y fin de cada corrida) en Datadog, para verlas en la misma línea de tiempo que HAProxy, los backends y PostgreSQL.
+
+**Cómo funciona.** El plugin `publish-metrics` de Artillery con `type: datadog` y **sin** `apiKey` envía las métricas al Datadog Agent por DogStatsD, así la API key nunca entra al contenedor de Artillery. Cada corrida lleva la etiqueta `test:<escenario>`. El Agent debe aceptar tráfico de otros contenedores ([7.10](#710-dogstatsd-métricas-de-artillery)).
+
+```yaml
+config:
+  plugins:
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:<escenario>"
+        event:
+          title: "Artillery <escenario>"
+          priority: normal
+          tags:
+            - "test:<escenario>"
+```
+
+**Prueba de integración** (`artillery/smoke-datadog.yml`: 20 s, 2 peticiones por segundo a `/api/info`):
+```powershell
+docker run --rm --network cluster-net -v "${PWD}/artillery:/scripts:ro" artilleryio/artillery:2.0.34 run /scripts/smoke-datadog.yml
+```
+Debes ver: el reporte de Artillery con 40 peticiones y, en Datadog, `artillery.http.requests{test:smoke-datadog}` sumando **40**, más los eventos "Started" y "Finished" en Event Management → All Events.
+
+| Qué mide | Métrica en Datadog |
+|---|---|
+| Peticiones totales y por segundo | `artillery.http.requests` · `artillery.http.request_rate` |
+| Latencia | `artillery.http.response_time.{p50,p95,p99,max}` |
+| Respuestas por código | `artillery.http.codes.<código>` |
+| Usuarios virtuales | `artillery.vusers.{created,completed,failed}` |
+
+> [!NOTE]
+> Artillery crea además métricas por URL (`artillery.plugins.metrics_by_endpoint.*`). Si la URL lleva un id que cambia (por ejemplo la silla), se genera una métrica distinta por cada id. En los escenarios, cada petición lleva un `name` fijo y el plugin se configura con `useOnlyRequestNames: true`.
+
+### 10.6 Preparar cada corrida
+
+`artillery/preparar_corrida.sh` deja el sistema en las mismas condiciones antes de cada prueba, para que el resultado de una corrida no afecte a la siguiente.
+
+| Comando | Qué hace |
+|---|---|
+| `verificar` | Solo lee. Comprueba que `db`, los backends, `haproxy` y `datadog-agent` están sanos, que HAProxy ve los 3 backends en `UP` y que el concierto de venta flash tiene 2.000 sillas libres. |
+| `reiniciar` | Hace esas comprobaciones, borra las reservas de prueba, devuelve esas sillas a `available` y vuelve a contar. |
+
+**Qué no hace:** no borra volúmenes (`pg-data`) ni usuarios, y no toca "Cuentos de medianoche" (40 reservas del seed: el evento queda agotado a propósito). El borrado y la liberación van en una sola transacción: si algo falla, no se aplica nada. Se niega a correr si hay un contenedor de Artillery activo.
+
+```powershell
+# Windows (Git Bash viene con Git)
+& "C:\Program Files\Git\bin\bash.exe" artillery/preparar_corrida.sh verificar
+& "C:\Program Files\Git\bin\bash.exe" artillery/preparar_corrida.sh reiniciar
+```
+```bash
+# Linux o macOS
+bash artillery/preparar_corrida.sh verificar
+```
+
+**Medido:** con una silla reservada, `verificar` falla (1.999 libres, mínimo 2.000). `reiniciar` la devuelve a 2.000 y el evento agotado sigue con sus 40 reservas.
 
 > ⏳ **Pendiente.** Paso a paso para apagar un backend, ver la alerta y comparar métricas antes, durante y después.
 
