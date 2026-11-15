@@ -1,0 +1,22 @@
+{
+  "config": {
+    "target": "http://haproxy:8080",
+    "phases": [
+      {
+        "name": "Referencia",
+        "duration": 133,
+        "arrivalRate": 4
+      },
+      {
+        "name": "Pico repentino",
+        "duration": 33,
+        "arrivalRate": 20
+      },
+      {
+        "name": "Recuperacion",
+        "duration": 134,
+        "arrivalRate": 4
+      }
+    ]
+  }
+}

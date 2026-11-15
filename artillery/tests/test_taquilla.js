@@ -1,0 +1,27 @@
+'use strict';
+const assert = require('node:assert/strict');
+const p = require('../taquilla.js');
+const events = { emit() {} };
+const response = (statusCode, body) => ({ statusCode, body: JSON.stringify(body) });
+(async () => {
+  process.env.JJ_EMAIL = 'prueba@example.invalid'; process.env.JJ_PASSWORD = 'solo-test';
+  process.env.JJ_EVENT_ID = '1'; process.env.JJ_OPERACION = 'reserva';
+  const ctx = { vars: {} };
+  await p.iniciar(ctx, events);
+  await p.login({}, response(200, { user: { id: 1 }, csrf_token: 'token-prueba' }), ctx, events);
+  assert.equal(ctx.vars.csrf_token, 'token-prueba');
+  await p.eventos({}, response(200, [{ id: 1 }]), ctx, events);
+  await p.sillas({}, response(200, [{ id: 5, status: 'reserved' }, { id: 8, status: 'available' }]), ctx, events);
+  assert.equal(ctx.vars.seat_id, 8);
+  await p.reserva({}, response(201, { id: 9, code: 'TS-000009' }), ctx, events);
+  await p.misReservas({}, response(200, [{ id: 9 }]), ctx, events);
+  await assert.rejects(p.login({}, response(401, {}), ctx, events), /HTTP_401/);
+  await assert.rejects(p.login({}, response(200, { user: { id: 1 } }), ctx, events), /CONTRATO/);
+  await assert.rejects(p.reserva({}, response(409, {}), ctx, events), /HTTP_409/);
+  await assert.rejects(p.sillas({}, response(200, []), ctx, events), /SIN_SILLAS/);
+  await assert.rejects(p.misReservas({}, response(200, []), ctx, events), /NO_VISIBLE/);
+  ctx.vars.operacion = 'consulta';
+  await p.sillas({}, response(200, []), ctx, events);
+  await p.misReservas({}, response(200, []), ctx, events);
+  console.log('OK: hooks, sesión/CSRF, selección disponible, 401, 409, falta de cupos y reserva visible. Respuestas simuladas.');
+})().catch(e => { console.error(e); process.exitCode = 1; });

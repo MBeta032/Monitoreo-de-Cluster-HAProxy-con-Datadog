@@ -676,9 +676,11 @@ Dos capturas (no se suben al repo):
 
 ## 9. Pruebas de carga
 
-<sub>👤 Responsable: Juan José Hurtado</sub>
+Responsable: Juan José Hurtado.
 
-> ⏳ **Pendiente.** Escenarios de Artillery y cómo ejecutarlos.
+Los escenarios de Artillery y el ejecutor están adaptados a la taquilla con sesión, CSRF y PostgreSQL. La campaña cubre intensidad, patrones, duración y comparación Round Robin/LeastConn; conserva las pruebas anteriores como históricas.
+
+Consulta la [guía completa de ejecución y entrega](docs/cierre-jj-hoy.md). La ejecución real de la nueva campaña y su correlación con Datadog deben verificarse mediante sus manifiestos e informes; disponer de los scripts no equivale a haber completado esos ensayos.
 
 ## 10. Pruebas de punta a punta y simulación de caída
 

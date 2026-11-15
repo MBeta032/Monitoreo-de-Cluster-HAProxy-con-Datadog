@@ -193,6 +193,17 @@ services:
 
   # --- artillery (Juan José) ---
 
+  artillery:
+    image: artilleryio/artillery:2.0.34
+    container_name: artillery
+    profiles: ["tools"]
+    working_dir: /scripts
+    volumes:
+      - ./artillery:/scripts:ro
+      - ./artillery/resultados:/results
+    networks:
+      - cluster-net
+
 networks:
   cluster-net:
     name: cluster-net
