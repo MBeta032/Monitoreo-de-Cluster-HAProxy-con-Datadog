@@ -176,6 +176,8 @@ services:
       DD_SITE: ${DD_SITE}
       DD_HOSTNAME: haproxy-telematicos-lab
       DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "false"
+      # Acepta métricas DogStatsD de otros contenedores (Artillery). El 8125 no se publica en el host.
+      DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"
       # La lee el check de postgres (etiqueta del servicio db) con %%env_DD_POSTGRES_PASSWORD%%
       DD_POSTGRES_PASSWORD: ${DD_POSTGRES_PASSWORD:?Define DD_POSTGRES_PASSWORD en el archivo .env (ver .env.example)}
     group_add:
