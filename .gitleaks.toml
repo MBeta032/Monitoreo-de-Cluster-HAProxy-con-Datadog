@@ -1,0 +1,11 @@
+title = "Configuración de Gitleaks del proyecto"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Hashes SHA-256 de integridad que guardan los manifest.json e inicio.json de las campañas de Artillery"
+regexTarget = "line"
+regexes = [
+  '''"(backends/auth\.py|backends/templates/auth\.html|backends/tests/test_auth\.py|parametros_no_secretos)"\s*:\s*"[0-9a-f]{64}"''',
+]
