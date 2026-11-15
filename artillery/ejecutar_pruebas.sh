@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Escenarios actuales de la taquilla. El ejecutor anterior está en historico/.
+# Ejecutor parametrizable: requiere Python 3 en el host.
+# Alternativa sin Python: docker compose run --rm artillery run /scripts/pico.yml -o /results/pico.json
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 if python --version >/dev/null 2>&1; then

@@ -2,25 +2,63 @@
 
 ## Alcance y estado real
 
-Esta copia está en la rama `integracion`, basada en `feature/mejora-dashboard`, commit `4358a09853a8d67f089897aef47579fd0041d742`. Esa base ya incorpora el backend mejorado con PostgreSQL y el dashboard. No hace falta reconstruirlos.
+Esta copia está en la rama `feature/mejora-carga`, basada en `feature/mejora-dashboard`, commit `4358a09853a8d67f089897aef47579fd0041d742`. Esa base ya incorpora el backend mejorado con PostgreSQL y el dashboard. No hace falta reconstruirlos.
 
 El desarrollo de JJ incluye Artillery en Compose, escenarios autenticados, reserva funcional con sesión/CSRF, ejecutor parametrizable, resultados identificados, análisis, CSV y gráficas. Las pruebas automatizadas de Python y JavaScript usan Docker/respuestas simulados: no sustituyen la ejecución real descrita aquí. No se han ejecutado desde el asistente las nuevas cargas contra Docker.
 
 Las pruebas anteriores del backend simple se conservan como históricas. No prueban el rendimiento de la nueva taquilla. La campaña nueva mide consultas autenticadas; las mezclas de operaciones, pausas, contención de reservas y variaciones de workers se coordinan con Gargamel. No se presentan como medidas por esta campaña.
+
+## Ejecución directa con Docker, sin Python en el host
+
+El wrapper `ejecutar_pruebas.sh` y la campaña automatizada requieren Python 3 en el host. Artillery ejecutado directamente utiliza el runtime de su imagen y no requiere Python en el host.
+
+Desde la raíz de un clon limpio, copia `.env.example` a `.env` sin sobrescribir un archivo existente. Completa las variables de infraestructura siguiendo el README (incluida una SECRET_KEY aleatoria y las contraseñas de la instalación), además de:
+
+- `JJ_EMAIL`: correo de una cuenta demo del README, sección 6.
+- `JJ_PASSWORD`: contraseña de esa cuenta demo, guardada solo en `.env`.
+- `JJ_EVENT_ID`: ID del evento que se consultará; el seed inicial incluye el evento 1.
+
+El bloque `environment` de Artillery transmite explícitamente esas variables. No se monta el archivo .env completo dentro del contenedor.
+
+```bash
+cp -n .env.example .env
+# Editar .env y completar los valores antes de continuar.
+docker compose --profile tools config --quiet
+docker compose up -d --build db backend1 backend2 backend3 haproxy datadog-agent
+# Esperar a que los tres backends aparezcan UP en http://localhost:8404/stats.
+mkdir -p artillery/resultados
+docker compose run --rm artillery run /scripts/pico.yml -o /results/pico.json
+```
+
+El último comando ejecuta el perfil gradual de `pico.yml` (540 segundos de fases), con consultas autenticadas. No crea reservas ni cambia el algoritmo de HAProxy. No equivale a la campaña de 14 corridas. Revisa los códigos HTTP y `vusers.failed` del resultado; terminar el proceso no garantiza que todas las solicitudes fueran exitosas.
+
+Para evitar reemplazar un resultado previo, usa un nombre único en Git Bash:
+
+```bash
+docker compose run --rm artillery run /scripts/pico.yml -o "/results/pico-$(date -u +%Y%m%dT%H%M%S)-${RANDOM}.json"
+```
+
+El resultado aparece en `artillery/resultados/` gracias al volumen `/results`. En Git Bash, si MSYS convierte las rutas `/scripts` o `/results` en rutas de Windows, antepone `MSYS_NO_PATHCONV=1` al comando. El ejecutor Python evita esa conversión al invocar Docker directamente.
+
+## Alcance de la restauración de HAProxy
+
+La campaña modifica temporalmente el archivo real `haproxy/haproxy.cfg` de esta copia, montado por Compose. No utiliza una copia alternativa montada: guarda el original en la carpeta de la campaña, aplica el algoritmo y recrea solo HAProxy.
+
+El bloque `finally` intenta restaurar los bytes originales y validar/recrear el servicio al finalizar, ante excepciones y ante un Ctrl+C que llegue a Python como KeyboardInterrupt. No garantiza recuperación automática ante un corte de energía, cierre forzado del proceso o una segunda interrupción durante la restauración. Si Docker no responde, puede quedar restaurado el archivo pero pendiente la recreación del servicio. Revisa `restauracion_haproxy` en el manifiesto y aplica la recuperación manual de esta guía cuando sea necesario. No ejecutes campañas simultáneas ni edites HAProxy durante una campaña.
 
 ## 1. Abrir la copia preparada
 
 Abre Docker Desktop y usa Git Bash:
 
 ```bash
-cd "/c/Users/ADMIN/Documents/Codex/2026-11-13/new-chat/work/integracion_taquilla"
+cd ~/Documents/integracion
 git branch --show-current
 python -m venv .venv-jj
 source .venv-jj/Scripts/activate
 python -m pip install -r artillery/requirements-informe-jj.txt
 ```
 
-La rama esperada es `integracion`. Si ya creaste el entorno, basta activarlo. Conserva abierta esta terminal. La carpeta original de Proyecto permanece separada; el despliegue usa los mismos nombres de proyecto/contenedores y actualizará el laboratorio local existente.
+La rama esperada es `feature/mejora-carga`. Si ya creaste el entorno, basta activarlo. Conserva abierta esta terminal. La carpeta original de Proyecto permanece separada; el despliegue usa los mismos nombres de proyecto/contenedores y actualizará el laboratorio local existente.
 
 ## 2. Preparar y levantar
 
@@ -99,7 +137,7 @@ python artillery/cierre_hoy.py informe --ultima
 | Plan, consola, tiempos, imágenes y configuración montada | `artillery/campanas/ID/` |
 | CSV, gráfica PNG e informe Markdown | `docs/evidencias/ID/FECHA/` |
 | Resultados del backend anterior | JSON anteriores en `artillery/resultados/`, `artillery/corridas/` y `docs/evidencias/carga-jj-20261114/` |
-| Implementación y procedimiento anteriores | `artillery/historico/` y `docs/historico-jj/` |
+| Implementación y procedimiento anteriores | Historial de Git y `docs/historico-jj/` |
 
 Lee el estado del manifiesto: `completada` indica que se ejecutó el plan, no que todas las solicitudes tuvieron éxito. Revisa 4xx, 5xx, usuarios fallidos, flujos completos, percentiles y restauración de HAProxy. Los 401/403 detienen la campaña porque invalidan la autenticación. Los fallos bajo carga se conservan como resultados.
 
@@ -125,9 +163,9 @@ Revisa que los cambios sean los esperados, que HAProxy haya quedado como estaba 
 
 ```bash
 git commit -m "feat(carga): integrar pruebas de taquilla y evidencias de JJ"
-git push -u origin integracion
+git push -u origin feature/mejora-carga
 ```
 
-Abre un PR desde esa rama hacia `feature/mejora-dashboard` para revisar solo los cambios de JJ, o hacia la rama de integración que acuerde el grupo si ya contiene esa base. No vuelvas a fusionar por separado los mismos cambios de backend/dashboard.
+Abre el PR desde `feature/mejora-carga` hacia `develop`, como solicitó el equipo. Revisa Files changed y los commits: esta rama parte de las mejoras de backend/dashboard y puede incluirlas si develop todavía no las contiene. No fusiones automáticamente cambios ajenos ni resuelvas sus conflictos sin revisar el contenido con los responsables.
 
 El PR debe indicar perfil de tráfico, campaña/fechas, resultados y limitaciones; enlazar informe y capturas; distinguir pruebas automatizadas de ejecución real. La entrega queda completa cuando los criterios acordados están ejecutados, el análisis está respaldado por JSON reales, la evidencia de Datadog está correlacionada y el PR contiene los archivos. Un fallo de rendimiento también es un resultado válido si se analiza y documenta.
