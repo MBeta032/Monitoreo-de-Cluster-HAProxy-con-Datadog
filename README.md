@@ -758,6 +758,18 @@ bash artillery/preparar_corrida.sh verificar
 
 **Medido:** con una silla reservada, `verificar` falla (1.999 libres, mínimo 2.000). `reiniciar` la devuelve a 2.000 y el evento agotado sigue con sus 40 reservas.
 
+### 10.7 Escenario de errores controlados
+
+`artillery/errores.yml` genera durante 7 minutos tráfico con respuestas 200, 401, 403, 404 y 500 (un 10 % de las peticiones va a `/error`). No reserva sillas, así que no necesita reiniciar los datos. Sirve para comprobar el monitor de errores 5xx ([8.2](#82-guía-de-alertas)).
+
+```powershell
+docker run --rm --network cluster-net -v "${PWD}/artillery:/scripts:ro" artilleryio/artillery:2.0.34 run /scripts/errores.yml
+```
+
+Debes ver: en el reporte, 2.100 usuarios virtuales completados y 0 fallidos, y respuestas 200, 401, 403, 404 y 500. Un 5xx de entre 9 y 10 % supera el umbral de 5 %.
+
+**Medido:** el aviso (> 2 %) llegó unos 2 o 3 minutos después de iniciar, la alerta (> 5 %) a los 3 o 4 minutos, y la recuperación unos 6 o 7 minutos después de terminar. El detalle está en el informe.
+
 > ⏳ **Pendiente.** Paso a paso para apagar un backend, ver la alerta y comparar métricas antes, durante y después.
 
 ---
