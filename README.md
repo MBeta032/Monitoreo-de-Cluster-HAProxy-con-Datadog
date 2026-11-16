@@ -136,6 +136,7 @@ flowchart LR
 ├── .env.example             # Plantilla de variables (copiar como .env)
 ├── .gitignore               # Archivos que Git no sube (incluye .env)
 ├── .gitattributes           # Fuerza finales de línea LF
+├── .gitleaks.toml           # Gitleaks: ignora los hashes de integridad de las campañas de Artillery
 ├── README.md
 ├── .github/
 │   └── workflows/
@@ -164,7 +165,15 @@ flowchart LR
 │       ├── 01_schema.sql    # Tablas: users, events, seats y reservations
 │       ├── 02_seed.sql      # Eventos, sillas y usuarios de prueba
 │       └── 03_datadog_user.sh # Usuario datadog de solo lectura para el Agent
-├── artillery/               # Escenarios de carga
+├── artillery/
+│   ├── smoke-datadog.yml    # Prueba corta de la integración Artillery con Datadog (40 peticiones)
+    ├── workers.yml    # Rampa de 2 a 12 usuarios por segundo para comparar workers
+    ├── workers.sh     # Recrea los backends con 1, 2 o 4 workers y corre la rampa
+│   ├── errores.yml          # Errores controlados 401, 403, 404 y 500 (7 min)
+│   ├── falla.yml            # Carga constante para la prueba de caída de un backend
+│   ├── falla.sh             # Detiene y vuelve a iniciar un backend durante la carga
+│   ├── preparar_corrida.sh  # Verifica el estado y reinicia las sillas de prueba
+│   └── analizar_datadog.py  # Informe de métricas de Datadog por corrida (antes, durante, después)
 └── docs/
     ├── diagramas/           # Diagramas de arquitectura
     └── evidencias/          # Capturas de las pruebas, una subcarpeta por parte
@@ -494,6 +503,7 @@ El **Datadog Agent** (un programa que corre junto a los demás contenedores) rec
 | `DD_API_KEY` | Clave de la organización |
 | `DD_SITE` | `datadoghq.com` |
 | `DD_POSTGRES_PASSWORD` | Contraseña del usuario `datadog` de PostgreSQL ([ver 7.7](#77-postgresql)); obligatoria, solo letras y números |
+| `DD_APP_KEY` | Application Key de Datadog (Organization Settings → Application Keys). Es opcional: solo la usa `analizar_datadog.py` para **consultar** métricas, no hace falta para levantar el clúster. Debe ser de la misma cuenta y región que `DD_API_KEY` |
 
 ### 7.2 Configuración del Agent
 
@@ -696,6 +706,18 @@ Dos capturas (no se suben al repo):
 
 <sub>👤 Responsable: Sharon Abella</sub>
 
+### 10.1 Antes de empezar (30 minutos antes)
+
+| # | Comprobación | Comando o lugar | Debe verse |
+|:-:|---|---|---|
+| 1 | Cuenta de Datadog vigente | Plan & Usage ([7.1](#71-cuenta-y-variables-de-entorno)) | La prueba vence el 20 de noviembre |
+| 2 | Todo sano | `docker compose ps` | `db`, backends y Agent en `(healthy)`; los 6 servicios arriba |
+| 3 | Sistema listo | `bash artillery/preparar_corrida.sh verificar` | 3 backends `UP` y 2.000 sillas libres |
+| 4 | HAProxy ve los 3 backends | <http://localhost:8404/stats> | `backend1` a `backend3` en verde |
+| 5 | Correo del equipo | Bandeja del Team `haproxy-telematicos` ([8.4](#84-cómo-importar-en-datadog)) | Abierta |
+| 6 | Pestañas listas | Dashboard (`nne-fkp-w5z`, rango "Past 15 minutes"), Logs con `service:haproxy`, Event Management, Monitors | Cada una cargada |
+| 7 | Terminales | Terminal 1 (carga) y Terminal 2 (caída), con letra grande y en la carpeta del repo | Comandos escritos y sin ejecutar |
+
 ### 10.5 Artillery con Datadog
 
 Las pruebas de Artillery publican sus métricas y dos eventos (inicio y fin de cada corrida) en Datadog, para verlas en la misma línea de tiempo que HAProxy, los backends y PostgreSQL.
@@ -768,11 +790,165 @@ docker run --rm --network cluster-net -v "${PWD}/artillery:/scripts:ro" artiller
 
 Debes ver: en el reporte, 2.100 usuarios virtuales completados y 0 fallidos, y respuestas 200, 401, 403, 404 y 500. Un 5xx de entre 9 y 10 % supera el umbral de 5 %.
 
-**Medido:** el aviso (> 2 %) llegó unos 2 o 3 minutos después de iniciar, la alerta (> 5 %) a los 3 o 4 minutos, y la recuperación unos 6 o 7 minutos después de terminar. El detalle está en el informe.
+**Medido:** el aviso (> 2 %) llegó 1 min 46 s después de iniciar y la alerta (> 5 %) a los 2 min 46 s. La recuperación llegó 5 min 43 s después de terminar: el monitor promedia los últimos 5 minutos y espera 60 s antes de evaluar (`evaluation_delay`), así que se recupera cuando los últimos datos con errores salen de esa ventana. El detalle está en [10.10](#1010-resultados-medidos).
 
-> ⏳ **Pendiente.** Paso a paso para apagar un backend, ver la alerta y comparar métricas antes, durante y después.
+### 10.8 Simulación de caída de un backend
 
+<sub>👤 Responsable: Sharon Abella</sub>
+
+Comprueba que HAProxy reparte entre los backends sanos cuando uno se cae y que Datadog avisa por correo. Dos formas: automática (con carga y horas medidas) y manual (para la demostración en vivo).
+
+**Antes de empezar**
+1. Todo sano: `bash artillery/preparar_corrida.sh verificar` (en Windows, con Git Bash).
+2. Abre el dashboard de Datadog (sección [8](#8-dashboard-y-monitores)) con el rango "Past 15 minutes" y el tablero de HAProxy en <http://localhost:8404/stats>.
+3. Comprueba que tu correo está en el canal del Team `haproxy-telematicos` ([8.4](#84-cómo-importar-en-datadog)).
+
+**Forma automática** (≈ 6 minutos y medio)
+```powershell
+& "C:\Program Files\Git\bin\bash.exe" artillery/falla.sh
+```
+```bash
+# Linux o macOS
+bash artillery/falla.sh
+```
+Para otro backend: `BACKEND=backend2 bash artillery/falla.sh`. El script arranca una carga constante de solo lectura, detiene el backend en el minuto 2, lo inicia en el minuto 4 y al final imprime la línea de tiempo (UTC) y el reparto de peticiones. Si lo interrumpes, deja el backend encendido.
+
+**Forma manual** (carga con Artillery en una terminal, la caída en otra)
+```powershell
+# Terminal 1: carga
+docker run --rm --network cluster-net -v "${PWD}/artillery:/scripts:ro" artilleryio/artillery:2.0.34 run /scripts/falla.yml
+# Terminal 2: a los 2 minutos, apaga un backend; a los 4, enciéndelo
+docker stop backend1
+docker start backend1
+```
+
+**Qué debes ver**
+
+| Dónde | Al apagar el backend | Al encenderlo |
+|---|---|---|
+| Tablero de HAProxy (8404) | `backend1` en rojo (`DOWN`) a los 5 o 6 s | Vuelve a verde (`UP`) en 4 a 9 s |
+| Dashboard, grupo "Estado" | El semáforo de `backend1` en rojo en 5 a 10 s | Vuelve a verde |
+| Dashboard, grupo "Tráfico" | Las peticiones de `backend1` caen a 0 y las de los otros dos suben | Se reparten en tercios otra vez |
+| Correo | `[CRÍTICO] ... marcó backend1 como caído`, unos 60 s después de la orden | `[RECUPERADO]`, unos 60 s después de iniciarlo | después | `
+
+Si el correo no llega, revisa la carpeta de spam y comprueba el Team ([8.4](#84-cómo-importar-en-datadog)).
+
+**Medido:** con 20 y 30 peticiones por segundo, el 99,98 % de las respuestas fue 200. Hubo un 502 por corrida y alguna petición de hasta 2 s, porque `timeout connect` es de 2 s y HAProxy tarda 5 o 6 s en sacar al backend del reparto.
+
+**Si algo queda apagado:** `docker compose up -d` lo vuelve a levantar. Si HAProxy no lo marca `UP` al volver, reinicia HAProxy: `docker compose restart haproxy` ([sección 4](#4-despliegue-rápido)).
+
+### 10.9 Analizar una corrida con las métricas de Datadog
+
+`artillery/analizar_datadog.py` consulta a Datadog las métricas de una corrida y las compara en tres momentos: **antes**, **durante** y **después**. Genera un resumen en la consola, una página HTML con gráficas y archivos CSV y JSON. Corre en un contenedor de Python, así que no instala nada en el equipo.
+
+**Requisitos:** `DD_API_KEY`, `DD_APP_KEY` y `DD_SITE` en `.env` ([7.1](#71-cuenta-y-variables-de-entorno)). El script solo lee esas tres variables y no las escribe en los reportes.
+
+```powershell
+docker run --rm -v "${PWD}:/app" -w /app python:3.14-slim python artillery/analizar_datadog.py --inicio 20:12:07 --fin 20:18:11 --falla-desde 20:14:07 --falla-hasta 20:16:07 --dia 2026-11-15 --test falla --titulo caida-backend1
+```
+
+| Parámetro | Qué hace |
+|---|---|
+| `--inicio` · `--fin` | Inicio y fin de la carga, en **UTC** (`HH:MM:SS` o `AAAA-MM-DDTHH:MM:SS`). `falla.sh` imprime estas horas; también están en los eventos "Started" y "Finished" de Datadog |
+| `--falla-desde` · `--falla-hasta` | Opcionales. Definen la fase «Durante» dentro de la corrida (la caída). Sin ellos, «Antes» y «Después» son los minutos previos y posteriores a la carga |
+| `--test` | Etiqueta `test:<nombre>` de Artillery. Agrega las métricas de Artillery de esa corrida |
+| `--margen` | Segundos antes y después de la carga (por defecto 180) |
+| `--dia` | Fecha UTC para las horas sin fecha (por defecto, hoy) |
+| `--titulo` | Nombre de la corrida (aparece en los archivos) |
+
+**Qué entrega** (en `reportes_datadog/`):
+- `*.html`: página con una gráfica por métrica y las fases sombreadas.
+- `*_fases.csv`: promedio, mínimo y máximo por fase. `*_series.csv`: todos los puntos. `*.json`: resumen.
+
+**Qué incluye:** tráfico, distribución, errores, latencia, CPU y memoria de los backends, PostgreSQL y Artillery. Calcula tres indicadores: el reparto de peticiones entre backends (%), las respuestas 5xx sobre las peticiones de HAProxy (%) y la duración media de las peticiones en la aplicación. Lista además los eventos de la ventana (inicio y fin de Artillery, Docker y alertas de los monitores) con la hora UTC y la hora de Cali.
+
+**Cómo leerlo**
+- Un asterisco (`*`) marca una fase con menos de la mitad de muestras que otras series: el valor no es representativo, por ejemplo cuando el contenedor estaba detenido.
+- «Sin datos» no siempre es un error: `artillery.http.codes.404` solo existe si hubo 404.
+- Las métricas más recientes tardan uno o dos minutos en llegar a Datadog. Si analizas justo al terminar, vuelve a correr el análisis.
+- La API de consulta de Datadog tiene un límite de peticiones por hora; el script hace unas 33 por corrida.
+
+### 10.10 Resultados medidos
+
+**Errores controlados** (`errores.yml`, 7 minutos, 5 usuarios virtuales por segundo)
+
+| Indicador | Resultado |
+|---|---|
+| Peticiones · usuarios virtuales completados · fallidos | 2.293 · 2.100 · 0 |
+| Respuestas 200 · 401 · 403 · 404 · 500 | 1.678 · 113 · 110 · 179 · 213 |
+| Tasa de 5xx | 9,3 % (Artillery) · 9,2 % (HAProxy) |
+| Reparto de peticiones entre backends | 33 / 33 / 33 % |
+| Duración media en la aplicación | 50 a 57 ms (3 a 5 ms antes de la prueba) |
+| CPU por backend · memoria | ≈ 0,12 núcleos de 1 · ≈ 101 MB de 384 |
+
+| Evento del monitor de 5xx | Hora (UTC) | Tiempo |
+|---|:---:|---|
+| Inicio de la corrida | 17:39:35 | |
+| `[Warn]` > 2 % | 17:41:21 | 1 min 46 s tras el inicio |
+| `[Triggered]` > 5 % | 17:42:21 | 2 min 46 s tras el inicio |
+| Fin de la corrida | 17:46:38 | |
+| `[Recovered]` | 17:52:21 | 5 min 43 s tras el fin |
+
+**Caída de `backend1`** (`falla.sh`, 20 peticiones por segundo; en la fase «Antes» el calentamiento de 30 s promedia 17 req/s y no 20)
+
+| Evento | Hora (UTC) | Tiempo |
+|---|:---:|---|
+| Orden de detener `backend1` | 20:14:07 | |
+| El contenedor termina (evento de Docker) | 20:14:10 | 3 s |
+| HAProxy lo marca `DOWN` | 20:14:12 | 5 s tras la orden |
+| `[Triggered]` en Datadog | 20:15:07 | 60 s tras la orden |
+| Orden de iniciar `backend1` | 20:16:07 | |
+| HAProxy lo marca `UP` | 20:16:11 | 4 s tras la orden |
+| `[Recovered]` en Datadog | 20:17:07 | 60 s tras la orden |
+
+| Indicador | Antes | Durante | Después |
+|---|:---:|:---:|:---:|
+| Reparto de peticiones `backend1` · `backend2` · `backend3` (%) | 33 · 33 · 33 | 1 · 49 · 49 | 31 · 34 · 34 |
+| Conexiones a PostgreSQL (% del máximo) | 25 | 17 | 25 |
+| Latencia p95 de Artillery (ms) | 9,3 | 175,7 | 7,9 |
+
+Con `backend1` caído el servicio no se interrumpió: 6.974 de 6.975 respuestas fueron 200 y hubo un 502. Las conexiones a PostgreSQL bajan de 25 % a 17 % porque un backend con 2 workers de 4 hilos tiene 8 conexiones, y vuelven al subir. El p95 «Durante» sube porque un solo intervalo de 10 s llegó a unos 2.019 ms. Es coherente con `timeout connect 2s` de HAProxy (README, 5.6), pero es una inferencia, no se comprobó.
+
+### 10.11 Revisión de secretos antes de entregar
+
+Comprueba que ninguna clave real quedó en el historial de Git, en cualquier rama. No imprime los valores.
+
+```powershell
+foreach ($n in 'DD_API_KEY','DD_APP_KEY','POSTGRES_PASSWORD','DD_POSTGRES_PASSWORD','SECRET_KEY') {
+  $linea = Get-Content .env | Where-Object { $_ -match "^$n=" } | Select-Object -First 1
+  $v = if ($linea) { ($linea -replace "^$n=", '').Trim().Trim('"').Trim("'") } else { '' }
+  if ($v.Length -lt 8) { "${n}: vacío, corto o ausente en .env"; continue }
+  $hits = git rev-list --all | ForEach-Object { git grep -l -F -e $v $_ 2>$null }
+  if ($hits) { "${n}: ENCONTRADA -> " + (($hits | Select-Object -First 5) -join ', ') } else { "${n}: no aparece en ningún commit" }
+}
+docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:latest detect --source /repo --log-opts="--all" --redact
+```
+Debes ver: `no aparece en ningún commit` y `no leaks found`. Una clave de menos de 8 caracteres no se puede buscar en el historial. Si una clave aparece, hay que **revocarla** en Datadog y crear otra; no se reescribe el historial.
+
+`.gitleaks.toml` exime solo los hashes SHA-256 de integridad que guardan los `manifest.json` e `inicio.json` de las campañas de Artillery. Se hace por línea y no por tipo de valor: una clave real de 64 caracteres hexadecimales (como `SECRET_KEY`) se seguiría detectando.
 ---
+
+### 10.12 Comparación de workers de Gunicorn
+
+Compara 1, 2 y 4 workers por backend con la misma carga. `artillery/workers.yml` sube de 2 a 12 usuarios virtuales por segundo en 6 minutos; cada uno inicia sesión una vez y hace 4 consultas de solo lectura, así que no modifica datos. `artillery/workers.sh` recrea los backends con el número de workers indicado, reinicia HAProxy ([sección 4](#4-despliegue-rápido)) y lanza la rampa. No modifica `.env`: pasa `BACKEND1_WORKERS`, `BACKEND2_WORKERS` y `BACKEND3_WORKERS` solo durante la ejecución.
+
+```powershell
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 2
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 1
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 4
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 2 repeticion
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh restaurar
+```
+```bash
+# Linux
+bash artillery/workers.sh 2
+```
+
+Al terminar, el script imprime el comando de [`analizar_datadog.py`](#109-analizar-una-corrida-con-las-métricas-de-datadog) con las horas de la corrida. El análisis divide la rampa en tres tercios de 2 minutos (Baja ≈ 3,7, Media ≈ 7 y Alta ≈ 10,3 usuarios por segundo). Se repite 2 workers para medir cuánto varía una corrida de otra.
+
+**Límites del experimento:** todo corre en un solo equipo (los backends comparten CPU con Artillery, PostgreSQL y el Agent) y cada backend tiene un límite de 1 CPU y 384 MB. Es una corrida por configuración, y dos para 2 workers.
+
+**Resultados:** _(se completan con las corridas)_
 
 ## 11. Solución de problemas
 
@@ -915,6 +1091,7 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 </details>
 
 
+
 <details>
 <summary>OpenMetrics no aparece en Datadog Agent</summary>
 
@@ -970,5 +1147,40 @@ Haz clic en el mensaje de error para ver su causa y su solución. Para agregar u
 - **Cómo verlo:** `docker compose logs datadog-agent --tail 20`.
 - **Solución:** llenar las dos variables en `.env` ([ver 7.1](#71-cuenta-y-variables-de-entorno)) y ejecutar `docker compose up -d datadog-agent`. Debes ver `API Key valid` en `docker compose exec -T datadog-agent agent status`.
 - <sub>Agregado por: Manuel</sub>
+
+</details>
+<details>
+<summary>Las métricas de Artillery no llegan a Datadog (<code>Metric Packets</code> no sube)</summary>
+
+- **Causa:** el Agent solo acepta paquetes DogStatsD del propio contenedor, y Artillery corre en otro.
+- **Solución:** el servicio `datadog-agent` debe tener `DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"` ([7.10](#710-dogstatsd-métricas-de-artillery)). Se comprueba con `docker compose exec -T datadog-agent agent status | Select-String "Metric Packets"` antes y después de una prueba: el número debe subir.
+- <sub>Agregado por: Sharon</sub>
+
+</details>
+
+<details>
+<summary><code>analizar_datadog.py</code> responde <code>HTTP 403</code></summary>
+
+- **Causa:** `DD_APP_KEY` falta, es de otra cuenta o `DD_SITE` no corresponde a la región de la cuenta.
+- **Solución:** crear la Application Key en Organization Settings → Application Keys, con la misma cuenta que la API key, y ponerla en `.env` ([7.1](#71-cuenta-y-variables-de-entorno)).
+- <sub>Agregado por: Sharon</sub>
+
+</details>
+
+<details>
+<summary>Un script <code>.sh</code> falla con <code>\r: command not found</code></summary>
+
+- **Causa:** el archivo tiene saltos de línea de Windows (CRLF).
+- **Solución:** en VS Code, cambiar `CRLF` por `LF` en la barra de abajo. Se comprueba con `git ls-files --eol artillery/falla.sh`: debe decir `i/lf w/lf`.
+- <sub>Agregado por: Sharon</sub>
+
+</details>
+
+<details>
+<summary><code>psql</code> dice <code>syntax error at or near "du"</code> al usar <code>\du</code> desde PowerShell</summary>
+
+- **Causa:** PowerShell se come la barra invertida al pasar el comando a Docker.
+- **Solución:** enviar el SQL por la entrada estándar en vez de usar comandos con barra: `"SELECT rolname FROM pg_roles;" | docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'`.
+- <sub>Agregado por: Sharon</sub>
 
 </details>
