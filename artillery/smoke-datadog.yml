@@ -1,0 +1,26 @@
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - duration: 20
+      arrivalRate: 2
+      name: "prueba de integración con Datadog"
+  plugins:
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:smoke-datadog"
+        event:
+          title: "Artillery smoke-datadog"
+          text: "Prueba de integración Artillery con Datadog"
+          priority: normal
+          tags:
+            - "test:smoke-datadog"
+
+scenarios:
+  - name: "info"
+    flow:
+      - get:
+          url: "/api/info"

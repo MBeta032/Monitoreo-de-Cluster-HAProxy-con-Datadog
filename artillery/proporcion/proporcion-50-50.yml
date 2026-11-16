@@ -1,0 +1,49 @@
+config:
+  target: "http://haproxy:8080"
+  processor: "proporcion.js"
+
+  phases:
+    - duration: 420
+      arrivalRate: 5
+      name: "50% consultas y 50% reservas"
+
+  plugins:
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "project:haproxy-cluster"
+          - "test:proporcion_50_50"
+
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  - name: "Consulta de sillas"
+    weight: 50
+    flow:
+      - get:
+          url: "/api/events/1/seats"
+          name: "consulta_sillas"
+
+  - name: "Reserva de silla"
+    weight: 50
+    flow:
+      - function: "asignarSilla"
+      - post:
+          url: "/api/login"
+          name: "login_reserva"
+          json:
+            email: "demo@taquilla.test"
+            password: "Taquilla2026!"
+          capture:
+            - json: "$.csrf_token"
+              as: "csrfToken"
+
+      - post:
+          url: "/api/events/1/seats/{{ seatId }}/reserve"
+          name: "reserva_silla"
+          headers:
+            X-CSRF-Token: "{{ csrfToken }}"

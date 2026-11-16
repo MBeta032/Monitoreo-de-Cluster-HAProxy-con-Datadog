@@ -1,0 +1,53 @@
+# variante A: SIN pausas entre acciones.
+# Solo lectura: no modifica datos, así que no hace falta reiniciar las sillas entre corridas.
+# Las tres variantes (sin, 1a3, 5s) tienen las mismas fases y las mismas peticiones por usuario;
+# lo único que cambia es la pausa entre una acción y la siguiente.
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - duration: 30
+      arrivalRate: 1
+      rampTo: 3
+      name: "calentamiento"
+    - duration: 240
+      arrivalRate: 3
+      name: "carga estable"
+  plugins:
+    # Métricas y eventos de inicio y fin hacia el Datadog Agent (DogStatsD).
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:pausas-sin"
+        event:
+          title: "Artillery pausas-sin"
+          text: "Criterio 6: usuarios sin pausas entre acciones"
+          priority: normal
+          tags:
+            - "test:pausas-sin"
+    # Una métrica por nombre de petición, no por URL.
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  - name: "usuario_sin_pausas"
+    flow:
+      - post:
+          url: "/api/login"
+          name: "login"
+          json:
+            email: "demo@taquilla.test"
+            password: "Taquilla2026!"
+      - loop:
+          - get:
+              url: "/api/events"
+              name: "cartelera"
+          - get:
+              url: "/api/events/1"
+              name: "evento"
+          - get:
+              url: "/api/events/1/seats?section=Platea"
+              name: "sillas_zona"
+        count: 4
