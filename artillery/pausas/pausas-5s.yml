@@ -1,0 +1,52 @@
+# variante C: pausa fija de 5 segundos entre acciones.
+# Mismas fases y mismas peticiones que pausas-sin.yml; solo cambia la pausa.
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - duration: 30
+      arrivalRate: 1
+      rampTo: 3
+      name: "calentamiento"
+    - duration: 240
+      arrivalRate: 3
+      name: "carga estable"
+  plugins:
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:pausas-5s"
+        event:
+          title: "Artillery pausas-5s"
+          text: "Criterio 6: usuarios con pausas de 5 s entre acciones"
+          priority: normal
+          tags:
+            - "test:pausas-5s"
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  - name: "usuario_con_pausas_5s"
+    flow:
+      - post:
+          url: "/api/login"
+          name: "login"
+          json:
+            email: "demo@taquilla.test"
+            password: "Taquilla2026!"
+      - loop:
+          - get:
+              url: "/api/events"
+              name: "cartelera"
+          - think: 5
+          - get:
+              url: "/api/events/1"
+              name: "evento"
+          - think: 5
+          - get:
+              url: "/api/events/1/seats?section=Platea"
+              name: "sillas_zona"
+          - think: 5
+        count: 4
