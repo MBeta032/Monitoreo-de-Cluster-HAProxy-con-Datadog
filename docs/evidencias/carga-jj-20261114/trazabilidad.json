@@ -1,0 +1,275 @@
+{
+  "seleccion": {
+    "Intensidad": [
+      [
+        "10 VU/s",
+        "0b8808ae"
+      ],
+      [
+        "20 VU/s",
+        "1b14c26f"
+      ],
+      [
+        "40 VU/s",
+        "00d6c633"
+      ],
+      [
+        "60 VU/s",
+        "b0e73b0e"
+      ]
+    ],
+    "Patrón": [
+      [
+        "Constante",
+        "1b14c26f"
+      ],
+      [
+        "Escalonado",
+        "df551a1f"
+      ],
+      [
+        "Pico",
+        "538df79c"
+      ]
+    ],
+    "Duración": [
+      [
+        "5 min",
+        "1b14c26f"
+      ],
+      [
+        "10 min",
+        "29b5c9ff"
+      ],
+      [
+        "15 min",
+        "a260e98f"
+      ]
+    ],
+    "Algoritmo": [
+      [
+        "RR 1",
+        "2903f136"
+      ],
+      [
+        "RR 2",
+        "f99b0918"
+      ],
+      [
+        "RR 3",
+        "e760d098"
+      ],
+      [
+        "LC 1",
+        "6cb95610"
+      ],
+      [
+        "LC 2",
+        "8e3ff9fe"
+      ],
+      [
+        "LC 3",
+        "aef019d1"
+      ]
+    ]
+  },
+  "fuentes": [
+    {
+      "id": "normal-constante-10vu-300s-20261114T010320372499Z-0b8808ae",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "45b2174cd50cec336c76aeade32ec277443c0e78b85d675d61ac533ba0065f6b",
+      "sha256_inicio": "2efb979f3394756dc836ea59b00bdca4536864752b2187f81415c38de1c38e4c",
+      "sha256_fin": "9dec836b9ef0aa7088e96e73bef247ee9cc4f4077053bb5bd489226ecf1ecc7f",
+      "sha256_overrides": "7cfbbab54503dec24ea7bbcf293b6c95b0b27550b4f2c0385e9a5a302057d306",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-20vu-300s-20261114T031649449858Z-1b14c26f",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "1f3f120df5d03a93dc68ac8d9a39a8179a868b51af0900060ba8c49cc8874908",
+      "sha256_inicio": "73f3548cbc116a721fea8c195cc4be37490376c2c55c20f0c0b196149c26ba35",
+      "sha256_fin": "a7469624ae2a40d25171736239bc28a284800bee3ae1818b548163685170d98b",
+      "sha256_overrides": "25d0fc8ab0effeb2114cc5446b3570e94f0ee2fff8b620ff7edb78dc8cc11b1a",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-40vu-300s-20261114T050707803231Z-00d6c633",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "c6e327d7e1a74e5deb510a5e3f72d43693118479dfbd7f7fc58a8778ea943cca",
+      "sha256_inicio": "3e5f8399e3a804c9d3a49fd93b8cea9608e0171183d0f09123fea2db15139a23",
+      "sha256_fin": "6a10a7f9569ff06827835f82eff074a33c43ada6b8edf7516e6b02bf6d00249b",
+      "sha256_overrides": "6fbcc1f23a21d0ffdad81d3ef3e04d4d383cace1568b4b3ee86a5533877d522f",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-60vu-300s-20261114T051714650588Z-b0e73b0e",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "16f5ce4ef348f0d9cd170f40a257c69b5c7b0c9c18409acfb1ec3ab76a748f69",
+      "sha256_inicio": "debd5d67ee3a8846d4797463d4223830fe1413604ef760a10ffcbde7b8f14ec9",
+      "sha256_fin": "1eae22629d2d683d0222a68ed371d24af8c8bd184364ea605f3081e697d1e644",
+      "sha256_overrides": "ab56260bd7d9d7de2d280ce542a3070d5af1fd07f92f4431a162584a47f31595",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-escalonado-20vu-300s-20261114T054639554240Z-df551a1f",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "d2071c7400ad1a27e0ddb955a98e06deac7aef5db0b5eee6fdfcb1f00548978b",
+      "sha256_inicio": "7b8f0796a625ac9b80acffa43d473d2b1aacd5811a4971d267141c92cad57dfa",
+      "sha256_fin": "0c263d2237fbe79c01feeae2f2938a9da54e1181bc7302a8f63d13973cafc8d2",
+      "sha256_overrides": "eea35465b18626d016ba9d9efe4851c1b11a46c2c437782a3a4b644d6ed8efe9",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-pico-20vu-300s-20261114T055344495521Z-538df79c",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "44c970cf9ae059acd586986d3c0c61292a9ec381c5d6cc0aed10f0b67ff2a3e9",
+      "sha256_inicio": "90f51a596716b425baeb0780ea8ebae0f855ef12b144d3d1a871bf41b9a184b8",
+      "sha256_fin": "199be6798a3bec37d484bec1333bd12a20487bcb0d1038bb48c2f8bb36efeb4a",
+      "sha256_overrides": "7fda12bbeb26fa821979d4fa05fa47e7d7f1a8377e426a7ea6d974aa3bd49a2a",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-20vu-600s-20261114T063656427326Z-29b5c9ff",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "80c5d20d5ad09710297998f1678e5de4415a35bc3041a07553cefd1ea2c9afac",
+      "sha256_inicio": "dc381af828c248528fd9914e1b694d383f7da94ac21d3a248e85873df995f082",
+      "sha256_fin": "569c6308f0b95c010b601bee74ab7f6de2c5949449a79c9046d03e36adc2cab8",
+      "sha256_overrides": "6b7b48c333efd70ce0e9eda09102f8a182e853afc50a62f1e349160f4d4d7b86",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-20vu-900s-20261114T065003666669Z-a260e98f",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "b8a00432f67e7dbcb65502eddb9bc42e06f69c13d372bcc59ccbaf797c228cf1",
+      "sha256_inicio": "789b105421c557353ac1e74f181c8469ba827a54e88c8959ae91816c47d9c259",
+      "sha256_fin": "4a3e07cbb5b496120973b3dccc60fd6bf46e653075156db9af27995b22913532",
+      "sha256_overrides": "beed2571b3813b8c4e861a9d5dd55aacbf75534dd3b4b3181aa0dcdb2ca3a778",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-20vu-300s-20261114T182319104832Z-2903f136",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "58afe4863307f793f2dc9bf4fe5ed16087d35a4b0d79f6c60d690b3001e5c974",
+      "sha256_inicio": "1f4ecf2bdc16f4c5ee05a098559067421055cb36da373da2250def461d982805",
+      "sha256_fin": "a23173658f409745552c8e02a4a64b21edaa0c29fedb0decf17ce121fc0f73d0",
+      "sha256_overrides": "25d0fc8ab0effeb2114cc5446b3570e94f0ee2fff8b620ff7edb78dc8cc11b1a",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-20vu-300s-20261114T182830273499Z-f99b0918",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "58cec5ac192df7f16238f06b9c5ca1bde15f2c0f30d5755059555a7dc5a4d176",
+      "sha256_inicio": "a8c78ee599e1d27c9dcdfb76f3af3eac9196d67d76506b0fc0f86d4405071306",
+      "sha256_fin": "b8d56734122f752c83a0e6ff11d4e553b3a94a7b4d880d2871bc4e629d78778c",
+      "sha256_overrides": "25d0fc8ab0effeb2114cc5446b3570e94f0ee2fff8b620ff7edb78dc8cc11b1a",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-20vu-300s-20261114T183338572298Z-e760d098",
+      "algoritmo_segun_config_local": "Round Robin",
+      "sha256_resultado": "9a9765936289655a21cf44fe05bc1f7014a68a6f1ed9c34650699d31cc15ea0e",
+      "sha256_inicio": "68aafb296575d6091f984dd48f403b5021bbd1d2f6072ac2782b7297727bd0c8",
+      "sha256_fin": "0a434106c14ae53cc20eba7eefdf4f19d000b0f01271b1f3b325a3a12e1501b2",
+      "sha256_overrides": "25d0fc8ab0effeb2114cc5446b3570e94f0ee2fff8b620ff7edb78dc8cc11b1a",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-20vu-300s-20261114T184620734623Z-6cb95610",
+      "algoritmo_segun_config_local": "Least Connections",
+      "sha256_resultado": "f365c44631d2ae282b7c3c4807f7e52b74db72de34ea6244951e931bf4b3433f",
+      "sha256_inicio": "c4d3ff4efac500462c4a87ff3fbec50067cf50cecce448221322db509ddc1707",
+      "sha256_fin": "19c77e14ca1f1ad55701f15527ee5c7ec034a958baa8b460d336d2b33a345370",
+      "sha256_overrides": "25d0fc8ab0effeb2114cc5446b3570e94f0ee2fff8b620ff7edb78dc8cc11b1a",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "a545fa2f005aa8fa166d6f1b62e11af0dd20e084d630b15931a3b35e3d8e6df6",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-20vu-300s-20261114T185129261670Z-8e3ff9fe",
+      "algoritmo_segun_config_local": "Least Connections",
+      "sha256_resultado": "4b01af972ffdbdf320142d36bfef222aa33c8dda0945f80c8bcedaa5b3a26fe6",
+      "sha256_inicio": "60ccf66aa99a359fb14706afe3af5fbb4759cbfd5893fff05211df97b2657a4e",
+      "sha256_fin": "fd8651301a69215bb1698d14b314ba8e7bd5758d54e760a3e3c399cea9204b20",
+      "sha256_overrides": "25d0fc8ab0effeb2114cc5446b3570e94f0ee2fff8b620ff7edb78dc8cc11b1a",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "a545fa2f005aa8fa166d6f1b62e11af0dd20e084d630b15931a3b35e3d8e6df6",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    },
+    {
+      "id": "normal-constante-20vu-300s-20261114T185637080493Z-aef019d1",
+      "algoritmo_segun_config_local": "Least Connections",
+      "sha256_resultado": "616f734cc2968923ce46eea0bf7f0d1004afab37e5574b2869d35363ec1acba8",
+      "sha256_inicio": "b7e3c7de2ae2e14c89f4b5f160ae1abc5d8f81ff1192b8f997cde3d7a9331206",
+      "sha256_fin": "464606319b137debb979b7c1b0eadb1c55d06f22f645dda11ae96743ad96f909",
+      "sha256_overrides": "25d0fc8ab0effeb2114cc5446b3570e94f0ee2fff8b620ff7edb78dc8cc11b1a",
+      "sha256_config_local_registrados": {
+        "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+        "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+        "haproxy/haproxy.cfg": "a545fa2f005aa8fa166d6f1b62e11af0dd20e084d630b15931a3b35e3d8e6df6",
+        "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+      }
+    }
+  ],
+  "nota": "Clasificación por configuración local registrada; no certifica el proceso activo."
+}

@@ -1,0 +1,74 @@
+{
+  "config": {
+    "target": "http://haproxy:8080",
+    "phases": [
+      {
+        "duration": 66,
+        "arrivalRate": 2,
+        "name": "escalonado fase 1"
+      },
+      {
+        "duration": 66,
+        "arrivalRate": 6,
+        "name": "escalonado fase 2"
+      },
+      {
+        "duration": 100,
+        "arrivalRate": 10,
+        "name": "escalonado fase 3"
+      },
+      {
+        "duration": 68,
+        "arrivalRate": 2,
+        "name": "escalonado fase 4"
+      }
+    ],
+    "processor": "./taquilla.js",
+    "http": {
+      "timeout": 30
+    },
+    "plugins": {
+      "metrics-by-endpoint": {}
+    }
+  },
+  "scenarios": [
+    {
+      "name": "Taquilla autenticada",
+      "beforeScenario": "iniciar",
+      "flow": [
+        {
+          "post": {
+            "url": "/api/login",
+            "json": {
+              "email": "{{ email }}",
+              "password": "{{ password }}"
+            },
+            "afterResponse": "login",
+            "name": "login"
+          }
+        },
+        {
+          "get": {
+            "url": "/api/events",
+            "afterResponse": "eventos",
+            "name": "eventos"
+          }
+        },
+        {
+          "get": {
+            "url": "/api/events/{{ event_id }}/seats",
+            "afterResponse": "sillas",
+            "name": "sillas"
+          }
+        },
+        {
+          "get": {
+            "url": "/api/reservations",
+            "afterResponse": "misReservas",
+            "name": "mis_reservas"
+          }
+        }
+      ]
+    }
+  ]
+}

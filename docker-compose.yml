@@ -193,6 +193,24 @@ services:
 
   # --- artillery (Juan José) ---
 
+  artillery:
+    image: artilleryio/artillery:2.0.34
+    container_name: artillery
+    profiles: ["tools"]
+    working_dir: /scripts
+    # Variables explícitas para ejecutar Artillery directamente, sin Python en el host.
+    # El procesador rechaza credenciales vacías antes de enviar solicitudes.
+    environment:
+      JJ_EMAIL: "${JJ_EMAIL:-}"
+      JJ_PASSWORD: "${JJ_PASSWORD:-}"
+      JJ_EVENT_ID: "${JJ_EVENT_ID:-1}"
+      JJ_OPERACION: "consulta"
+    volumes:
+      - ./artillery:/scripts:ro
+      - ./artillery/resultados:/results
+    networks:
+      - cluster-net
+
 networks:
   cluster-net:
     name: cluster-net

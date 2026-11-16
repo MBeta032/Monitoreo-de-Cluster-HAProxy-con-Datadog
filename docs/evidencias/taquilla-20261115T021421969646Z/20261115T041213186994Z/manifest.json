@@ -1,0 +1,427 @@
+{
+  "id": "taquilla-20261115T021421969646Z",
+  "tipo": "campana",
+  "estado": "completada",
+  "base_vu_s": 2,
+  "huellas": {
+    "docker-compose.yml": "af8b6f1335ec1fc73a40fa44811922851d7456a2a24a1a7e181f2286d6e698a7",
+    "artillery/normal.yml": "6f233d9ed2e71cf652e66a4ba6cc331d85eedcfcbcd00d8e82db3e9990e5111a",
+    "artillery/pico.yml": "7be8e4767ceae5b686b4ca9d0c1fe589c1326cbcfd2faefb8428285650ccd4c0",
+    "artillery/taquilla.js": "9233f821b7c8de4f5c1b9faf94cbddd3b7a2ff3b9a2bcf44f0ca7d344680b532",
+    "artillery/cierre_hoy.py": "0efefb59bf8f3182e78de5b28748c0cfef8ca094423e0502f52f132d21b3c870",
+    "backends/app.py": "b42f4bc1d41e84ad8ea570628aa4841fb81d3ea60b9eaf05ea8735b62c318be6",
+    "backends/auth.py": "ad5e290638c4a965210b2d49b221556a60de1e2ee30fc984537f9b6c141f764f",
+    "backends/db.py": "204f86e5b67bc09effc6ab6c4235537898e5f6fe97f1fc24c34a5c9d70382d9b",
+    "backends/gunicorn.conf.py": "314859e1795e70b2a3b1251fae91c55a70b2e180a124e2bc90a1d9a444e6c5bf",
+    "backends/requirements-dev.txt": "543a97dbbb696f6cc90304e2b2a3140e70ec7bb2b9545949c612578e789e0b39",
+    "backends/requirements.txt": "2e321ce8855696551fdd412ea49ddc4cb76b80adc2dd9ae21c5dc31dab9a2318",
+    "backends/static/seat_picker.js": "219582d7072f444ed80418624047360ed305cceaf81534f01a8e5fb1c3208f33",
+    "backends/templates/auth.html": "4cae0419d386058706f20426976b65f582798edc353a5a1c145ee2b7fa4cb45f",
+    "backends/templates/base.html": "ad2b201ef6b72839a663948016ca043d37715b5178e14682d64cf3ea3445674b",
+    "backends/templates/confirm.html": "aa6fcf92495b597d0c3839539afa8d4f5ab158af368399a1bd93d4d34483ec62",
+    "backends/templates/error.html": "26c830567f81681dac7f3abda902177a5212d20ea142bf3141faed9627eec9e0",
+    "backends/templates/event.html": "f72fc7da97fabec6095e7f3e52d615f78e05d7adccc2083109d70bdcfb1a9417",
+    "backends/templates/index.html": "69b536b84d71d7d51714cf9346ca79aafabc393b50116f94b3f070e5b90464c7",
+    "backends/templates/reservation_done.html": "f4c0952d84019e2577d5aa40a4b2971209e1b5d8c42c89570ef0007e559e49e0",
+    "backends/templates/reservations.html": "52a82d623a7658e0611911fe44548901a8fb3b71721e3d3831f667c410f6b700",
+    "backends/templates/sold_out_notice.html": "1921e8db4491c97af06015fd3400e4189a39c186e4c18d5ff8654b183063075a",
+    "backends/templates/steps.html": "de0cce8935dd729ad48227283aaf591ba688539ea9d506cddf2ffd0bacff98b7",
+    "backends/templates/venue_map.html": "9fe56ae1af42de0e44712487f562c8f1035ff5b4697ad27cd5aef40c38e5e211",
+    "backends/tests/conftest.py": "f7204d9c96c887aa6465765e50a3116c16b8ff39190b3cc6c3266dfe23545fdd",
+    "backends/tests/test_app.py": "b4484d87a1b7c4dbea8ec2438e4ef39662af4829e325238b1147c3415c036a45",
+    "backends/tests/test_auth.py": "fad2ee666db02c10e82565f0aad40482cefcffd6036d2c5ad351fc421050f891",
+    "backends/tests/test_database.py": "cb4e09d0712034bc6174ce9b4732161d96cea8c28e02b187f524eafa34cac938",
+    "backends/tests/test_reservations.py": "f4607daefa7536783ecc48698fb86be2e844ef2a831295ca9e2f2b839f29b8ff",
+    "parametros_no_secretos": "b0bf6f2bdb8dd17658f96919b68d52210fea51a490e40f895fcfbd0e87e48287"
+  },
+  "plan": [
+    {
+      "label": "intensidad-10",
+      "grupos": [
+        "intensidad",
+        "patron"
+      ],
+      "rate": 10,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "intensidad-20",
+      "grupos": [
+        "intensidad"
+      ],
+      "rate": 20,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "intensidad-40",
+      "grupos": [
+        "intensidad"
+      ],
+      "rate": 40,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "intensidad-60",
+      "grupos": [
+        "intensidad"
+      ],
+      "rate": 60,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "escalonado",
+      "grupos": [
+        "patron"
+      ],
+      "rate": 10,
+      "seconds": 300,
+      "pattern": "escalonado",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "pico",
+      "grupos": [
+        "patron"
+      ],
+      "rate": 10,
+      "seconds": 300,
+      "pattern": "pico",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "duracion-600",
+      "grupos": [
+        "duracion"
+      ],
+      "rate": 2,
+      "seconds": 600,
+      "pattern": "constante",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "duracion-900",
+      "grupos": [
+        "duracion"
+      ],
+      "rate": 2,
+      "seconds": 900,
+      "pattern": "constante",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "roundrobin-1",
+      "grupos": [
+        "algoritmo",
+        "duracion"
+      ],
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "roundrobin-2",
+      "grupos": [
+        "algoritmo"
+      ],
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "roundrobin-3",
+      "grupos": [
+        "algoritmo"
+      ],
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "roundrobin"
+    },
+    {
+      "label": "leastconn-1",
+      "grupos": [
+        "algoritmo"
+      ],
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "leastconn"
+    },
+    {
+      "label": "leastconn-2",
+      "grupos": [
+        "algoritmo"
+      ],
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "leastconn"
+    },
+    {
+      "label": "leastconn-3",
+      "grupos": [
+        "algoritmo"
+      ],
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "algorithm": "leastconn"
+    }
+  ],
+  "corridas": [
+    {
+      "id": "intensidad-10-20261115T021426848926Z-e6f6fc",
+      "label": "intensidad-10",
+      "grupos": [
+        "intensidad",
+        "patron"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 10,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/intensidad-10-20261115T021426848926Z-e6f6fc.json",
+      "inicio_utc": "2026-11-15T02:14:27.691326+00:00",
+      "fin_utc": "2026-11-15T02:19:34.560715+00:00",
+      "vu_programados": 3000,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "intensidad-20-20261115T021934566124Z-52cede",
+      "label": "intensidad-20",
+      "grupos": [
+        "intensidad"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 20,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/intensidad-20-20261115T021934566124Z-52cede.json",
+      "inicio_utc": "2026-11-15T02:19:35.368303+00:00",
+      "fin_utc": "2026-11-15T02:24:58.264873+00:00",
+      "vu_programados": 6000,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "intensidad-40-20261115T022458271582Z-b69216",
+      "label": "intensidad-40",
+      "grupos": [
+        "intensidad"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 40,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/intensidad-40-20261115T022458271582Z-b69216.json",
+      "inicio_utc": "2026-11-15T02:24:59.003176+00:00",
+      "fin_utc": "2026-11-15T02:30:23.739575+00:00",
+      "vu_programados": 12000,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "intensidad-60-20261115T023029793739Z-a41eaf",
+      "label": "intensidad-60",
+      "grupos": [
+        "intensidad"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 60,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/intensidad-60-20261115T023029793739Z-a41eaf.json",
+      "inicio_utc": "2026-11-15T02:30:30.513457+00:00",
+      "fin_utc": "2026-11-15T02:36:03.345407+00:00",
+      "vu_programados": 18000,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "escalonado-20261115T023629525281Z-c8ef17",
+      "label": "escalonado",
+      "grupos": [
+        "patron"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 10,
+      "seconds": 300,
+      "pattern": "escalonado",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/escalonado-20261115T023629525281Z-c8ef17.json",
+      "inicio_utc": "2026-11-15T02:36:30.249109+00:00",
+      "fin_utc": "2026-11-15T02:41:40.829926+00:00",
+      "vu_programados": 1664,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "pico-20261115T024140834757Z-8f0849",
+      "label": "pico",
+      "grupos": [
+        "patron"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 10,
+      "seconds": 300,
+      "pattern": "pico",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/pico-20261115T024140834757Z-8f0849.json",
+      "inicio_utc": "2026-11-15T02:41:41.642655+00:00",
+      "fin_utc": "2026-11-15T02:46:48.167200+00:00",
+      "vu_programados": 864,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "duracion-600-20261115T024648173999Z-1f85dc",
+      "label": "duracion-600",
+      "grupos": [
+        "duracion"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 2,
+      "seconds": 600,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/duracion-600-20261115T024648173999Z-1f85dc.json",
+      "inicio_utc": "2026-11-15T02:46:48.978125+00:00",
+      "fin_utc": "2026-11-15T02:56:53.640809+00:00",
+      "vu_programados": 1200,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "duracion-900-20261115T025653647321Z-6951d9",
+      "label": "duracion-900",
+      "grupos": [
+        "duracion"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 2,
+      "seconds": 900,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/duracion-900-20261115T025653647321Z-6951d9.json",
+      "inicio_utc": "2026-11-15T02:56:54.446504+00:00",
+      "fin_utc": "2026-11-15T03:11:59.615438+00:00",
+      "vu_programados": 1800,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "roundrobin-1-20261115T031159623054Z-062d8d",
+      "label": "roundrobin-1",
+      "grupos": [
+        "algoritmo",
+        "duracion"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/roundrobin-1-20261115T031159623054Z-062d8d.json",
+      "inicio_utc": "2026-11-15T03:12:00.432415+00:00",
+      "fin_utc": "2026-11-15T03:17:12.810477+00:00",
+      "vu_programados": 600,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "roundrobin-2-20261115T031712817896Z-53fad7",
+      "label": "roundrobin-2",
+      "grupos": [
+        "algoritmo"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/roundrobin-2-20261115T031712817896Z-53fad7.json",
+      "inicio_utc": "2026-11-15T03:17:13.619183+00:00",
+      "fin_utc": "2026-11-15T03:22:18.088517+00:00",
+      "vu_programados": 600,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "roundrobin-3-20261115T032218112040Z-2f5a8d",
+      "label": "roundrobin-3",
+      "grupos": [
+        "algoritmo"
+      ],
+      "algorithm": "roundrobin",
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/roundrobin-3-20261115T032218112040Z-2f5a8d.json",
+      "inicio_utc": "2026-11-15T03:22:18.986538+00:00",
+      "fin_utc": "2026-11-15T03:27:31.390074+00:00",
+      "vu_programados": 600,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "leastconn-1-20261115T032736691314Z-44bafa",
+      "label": "leastconn-1",
+      "grupos": [
+        "algoritmo"
+      ],
+      "algorithm": "leastconn",
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/leastconn-1-20261115T032736691314Z-44bafa.json",
+      "inicio_utc": "2026-11-15T03:27:37.406302+00:00",
+      "fin_utc": "2026-11-15T03:32:42.570247+00:00",
+      "vu_programados": 600,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "leastconn-2-20261115T033242576182Z-df788c",
+      "label": "leastconn-2",
+      "grupos": [
+        "algoritmo"
+      ],
+      "algorithm": "leastconn",
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/leastconn-2-20261115T033242576182Z-df788c.json",
+      "inicio_utc": "2026-11-15T03:32:43.357409+00:00",
+      "fin_utc": "2026-11-15T03:37:51.886436+00:00",
+      "vu_programados": 600,
+      "operacion": "consulta",
+      "valida": true
+    },
+    {
+      "id": "leastconn-3-20261115T033751892935Z-f38ae9",
+      "label": "leastconn-3",
+      "grupos": [
+        "algoritmo"
+      ],
+      "algorithm": "leastconn",
+      "rate": 2,
+      "seconds": 300,
+      "pattern": "constante",
+      "resultado": "artillery/resultados/taquilla/taquilla-20261115T021421969646Z/leastconn-3-20261115T033751892935Z-f38ae9.json",
+      "inicio_utc": "2026-11-15T03:37:52.674664+00:00",
+      "fin_utc": "2026-11-15T03:42:57.138995+00:00",
+      "vu_programados": 600,
+      "operacion": "consulta",
+      "valida": true
+    }
+  ],
+  "inicio_utc": "2026-11-15T02:14:21.983730+00:00",
+  "perfil": "Un login y tres consultas por VU. Reserva validada separadamente en humo.",
+  "fin_utc": "2026-11-15T03:42:57.141715+00:00",
+  "restauracion_haproxy": "aplicada"
+}

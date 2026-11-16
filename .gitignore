@@ -16,3 +16,10 @@ __pycache__/
 
 # Configuración local de Claude Code (permisos de esta máquina)
 .claude/settings.local.json
+
+# Entrega y evidencias de JJ
+!artillery/corridas/*/consola.log
+!artillery/campanas/*/*/consola.log
+.venv-jj/
+__pycache__/
+*.bak

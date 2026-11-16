@@ -1,0 +1,12 @@
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - name: "Carga normal"
+      duration: 180
+      arrivalRate: 5
+
+scenarios:
+  - name: "Consultar la página principal"
+    flow:
+      - get:
+          url: "/"
