@@ -9,6 +9,7 @@ services:
   # --- haproxy (Manuel) ---
   haproxy:
     image: haproxy:2.6
+    restart: unless-stopped
     container_name: haproxy
     hostname: haproxy
     ports:
@@ -172,8 +173,8 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     environment:
-      DD_API_KEY: ${DD_API_KEY}
-      DD_SITE: ${DD_SITE}
+      DD_API_KEY: ${DD_API_KEY:?Define DD_API_KEY en el archivo .env (ver .env.example)}
+      DD_SITE: ${DD_SITE:?Define DD_SITE en el archivo .env (ver .env.example)}
       DD_HOSTNAME: haproxy-telematicos-lab
       DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "false"
       # La lee el check de postgres (etiqueta del servicio db) con %%env_DD_POSTGRES_PASSWORD%%
