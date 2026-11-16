@@ -708,21 +708,111 @@ Dos capturas (no se suben al repo):
 
 ### 10.1 Antes de empezar (30 minutos antes)
 
+Antes de ejecutar las pruebas, verifica que el entorno esté disponible y que las herramientas de monitoreo estén preparadas.
+
 | # | Comprobación | Comando o lugar | Debe verse |
 |:-:|---|---|---|
 | 1 | Cuenta de Datadog vigente | Plan & Usage ([7.1](#71-cuenta-y-variables-de-entorno)) | La prueba vence el 20 de noviembre |
-| 2 | Todo sano | `docker compose ps` | `db`, backends y Agent en `(healthy)`; los 6 servicios arriba |
+| 2 | Todo sano | `docker compose ps` | `db`, los tres backends, HAProxy y Agent en estado saludable; los 6 servicios arriba |
 | 3 | Sistema listo | `bash artillery/preparar_corrida.sh verificar` | 3 backends `UP` y 2.000 sillas libres |
 | 4 | HAProxy ve los 3 backends | <http://localhost:8404/stats> | `backend1` a `backend3` en verde |
-| 5 | Correo del equipo | Bandeja del Team `haproxy-telematicos` ([8.4](#84-cómo-importar-en-datadog)) | Abierta |
-| 6 | Pestañas listas | Dashboard (`nne-fkp-w5z`, rango "Past 15 minutes"), Logs con `service:haproxy`, Event Management, Monitors | Cada una cargada |
-| 7 | Terminales | Terminal 1 (carga) y Terminal 2 (caída), con letra grande y en la carpeta del repo | Comandos escritos y sin ejecutar |
+| 5 | Correo del equipo | Bandeja del Team `haproxy-telematicos` ([8.4](#84-cómo-importar-en-datadog)) | Bandeja abierta |
+| 6 | Pestañas listas | Dashboard (`nne-fkp-w5z`, rango "Past 15 minutes"), Logs con `service:haproxy`, Event Management y Monitors | Cada una cargada |
+| 7 | Terminales | Terminal 1 (carga) y Terminal 2 (caída), con letra grande y en la carpeta del repositorio | Comandos escritos y sin ejecutar |
+
+### 10.2 Verificación de la infraestructura
+
+Antes de generar carga, comprueba que los componentes principales estén funcionando y que HAProxy pueda comunicarse con los tres backends.
+
+**1. Revisar los contenedores**
+
+```bash
+docker compose ps
+```
+
+Verifica que estén activos PostgreSQL (`db`), los tres backends, HAProxy y Datadog Agent. Los servicios deben aparecer en estado saludable cuando tengan configurado un health check.
+
+**2. Comprobar la disponibilidad de los backends**
+
+```bash
+bash artillery/preparar_corrida.sh verificar
+```
+
+El resultado debe indicar que los tres backends están disponibles (`UP`) y que el sistema cumple las condiciones iniciales para las pruebas.
+
+**3. Consultar el estado de HAProxy**
+
+Abre <http://localhost:8404/stats> y comprueba que `backend1`, `backend2` y `backend3` aparezcan en verde (`UP`).
+
+**4. Comprobar Datadog**
+
+En Datadog, revisa el dashboard de HAProxy y los monitores configurados. También puedes consultar los contenedores para verificar que el Agent esté activo:
+
+```bash
+docker compose ps datadog-agent
+```
+
+No se debe iniciar una prueba de carga si alguno de los backends está caído, HAProxy no lo reconoce como disponible o el Agent no está funcionando.
+
+### 10.3 Validación de la integración Artillery–Datadog
+
+Antes de ejecutar escenarios más largos, se utiliza una prueba pequeña para comprobar que Artillery puede generar tráfico y enviar sus métricas a Datadog.
+
+El archivo `artillery/smoke-datadog.yml` realiza una prueba de 20 segundos, con una tasa de 2 peticiones por segundo al endpoint `/api/info`.
+
+**Ejecutar la prueba**
+
+```powershell
+docker run --rm --network cluster-net -v "${PWD}/artillery:/scripts:ro" artilleryio/artillery:2.0.34 run /scripts/smoke-datadog.yml
+```
+
+**Resultados esperados**
+
+- El reporte de Artillery debe mostrar 40 peticiones.
+- En Datadog, la métrica `artillery.http.requests{test:smoke-datadog}` debe acumular 40.
+- En Event Management → All Events deben aparecer los eventos "Started" y "Finished".
+
+Esta comprobación permite verificar que la comunicación entre Artillery, DogStatsD y Datadog funciona antes de comenzar las pruebas principales.
+
+### 10.4 Criterios generales para ejecutar las pruebas
+
+Para que los resultados puedan compararse y analizarse correctamente, todas las corridas deben seguir unas condiciones comunes.
+
+**Identificación de cada corrida**
+
+Cada escenario debe utilizar una etiqueta que permita distinguir sus métricas en Datadog mediante el tag `test:<nombre>`. Por ejemplo:
+
+- `test:smoke-datadog`
+- `test:falla`
+- `test:pausas-1a3`
+- `test:concurrencia_misma_silla`
+- `test:concurrencia_distribuida`
+
+**Registro de horarios**
+
+Se deben conservar las horas de inicio y finalización que aparecen en el reporte de Artillery o en los eventos "Started" y "Finished" de Datadog. Estos horarios se utilizan posteriormente para consultar las métricas correspondientes a cada corrida.
+
+**Zona horaria**
+
+El análisis de Datadog utiliza horas UTC. Colombia tiene una diferencia de cinco horas respecto a UTC (UTC-5), por lo que se debe tener presente esta diferencia al consultar eventos y comparar los horarios de ejecución.
+
+**Condiciones de ejecución**
+
+- Verificar el estado de los servicios antes de iniciar.
+- Ejecutar una prueba a la vez, evitando que otras cargas interfieran con los resultados.
+- No detener manualmente los contenedores durante una prueba, excepto cuando el escenario lo requiera.
+- Registrar el reporte de Artillery y conservar los archivos generados por el análisis de Datadog.
+- Esperar entre uno y dos minutos después de una corrida para permitir que las métricas más recientes lleguen a Datadog.
+
+Estas condiciones ayudan a mantener un registro ordenado y facilitan la comparación entre escenarios.
 
 ### 10.5 Artillery con Datadog
 
-Las pruebas de Artillery publican sus métricas y dos eventos (inicio y fin de cada corrida) en Datadog, para verlas en la misma línea de tiempo que HAProxy, los backends y PostgreSQL.
+Las pruebas de Artillery publican sus métricas y dos eventos (inicio y fin de cada corrida) en Datadog, para visualizarlas en la misma línea de tiempo que HAProxy, los backends y PostgreSQL.
 
-**Cómo funciona.** El plugin `publish-metrics` de Artillery con `type: datadog` y **sin** `apiKey` envía las métricas al Datadog Agent por DogStatsD, así la API key nunca entra al contenedor de Artillery. Cada corrida lleva la etiqueta `test:<escenario>`. El Agent debe aceptar tráfico de otros contenedores ([7.10](#710-dogstatsd-métricas-de-artillery)).
+**Cómo funciona.** El plugin `publish-metrics` de Artillery con `type: datadog` y **sin** `apiKey` envía las métricas al Datadog Agent por DogStatsD. De esta manera, la API key no necesita estar dentro del contenedor de Artillery. Cada corrida lleva la etiqueta `test:<escenario>`. El Agent debe aceptar tráfico de otros contenedores ([7.10](#710-dogstatsd-métricas-de-artillery)).
+
+Configuración utilizada en los escenarios:
 
 ```yaml
 config:
@@ -741,11 +831,7 @@ config:
             - "test:<escenario>"
 ```
 
-**Prueba de integración** (`artillery/smoke-datadog.yml`: 20 s, 2 peticiones por segundo a `/api/info`):
-```powershell
-docker run --rm --network cluster-net -v "${PWD}/artillery:/scripts:ro" artilleryio/artillery:2.0.34 run /scripts/smoke-datadog.yml
-```
-Debes ver: el reporte de Artillery con 40 peticiones y, en Datadog, `artillery.http.requests{test:smoke-datadog}` sumando **40**, más los eventos "Started" y "Finished" en Event Management → All Events.
+**Métricas recopiladas**
 
 | Qué mide | Métrica en Datadog |
 |---|---|
@@ -755,69 +841,94 @@ Debes ver: el reporte de Artillery con 40 peticiones y, en Datadog, `artillery.h
 | Usuarios virtuales | `artillery.vusers.{created,completed,failed}` |
 
 > [!NOTE]
-> Artillery crea además métricas por URL (`artillery.plugins.metrics_by_endpoint.*`). Si la URL lleva un id que cambia (por ejemplo la silla), se genera una métrica distinta por cada id. En los escenarios, cada petición lleva un `name` fijo y el plugin se configura con `useOnlyRequestNames: true`.
+> Artillery crea además métricas por URL (`artillery.plugins.metrics_by_endpoint.*`). Si la URL lleva un identificador que cambia (por ejemplo, la silla), se genera una métrica distinta por cada identificador. En los escenarios se utiliza un `name` fijo para cada petición y el plugin se configura con `useOnlyRequestNames: true`.
 
 ### 10.6 Preparar cada corrida
 
-`artillery/preparar_corrida.sh` deja el sistema en las mismas condiciones antes de cada prueba, para que el resultado de una corrida no afecte a la siguiente.
+El script `artillery/preparar_corrida.sh` permite dejar el sistema en condiciones controladas antes de ejecutar las pruebas, para evitar que los resultados de una corrida afecten a la siguiente.
 
 | Comando | Qué hace |
 |---|---|
-| `verificar` | Solo lee. Comprueba que `db`, los backends, `haproxy` y `datadog-agent` están sanos, que HAProxy ve los 3 backends en `UP` y que el concierto de venta flash tiene 2.000 sillas libres. |
-| `reiniciar` | Hace esas comprobaciones, borra las reservas de prueba, devuelve esas sillas a `available` y vuelve a contar. |
+| `verificar` | Solo lee. Comprueba que `db`, los backends, `haproxy` y `datadog-agent` estén sanos, que HAProxy vea los tres backends en `UP` y que el evento de venta flash tenga 2.000 sillas libres. |
+| `reiniciar` | Realiza las mismas comprobaciones, elimina las reservas de prueba, devuelve esas sillas a `available` y vuelve a contar su disponibilidad. |
 
-**Qué no hace:** no borra volúmenes (`pg-data`) ni usuarios, y no toca "Cuentos de medianoche" (40 reservas del seed: el evento queda agotado a propósito). El borrado y la liberación van en una sola transacción: si algo falla, no se aplica nada. Se niega a correr si hay un contenedor de Artillery activo.
+**Qué no hace:** no borra volúmenes (`pg-data`) ni usuarios, y no modifica "Cuentos de medianoche" (40 reservas del seed: el evento queda agotado a propósito). La eliminación de reservas y la liberación de sillas se realizan en una sola transacción: si algo falla, no se aplica ningún cambio. El script también se niega a ejecutarse si detecta un contenedor de Artillery activo.
+
+**Ejecutar en Windows (Git Bash):**
 
 ```powershell
-# Windows (Git Bash viene con Git)
 & "C:\Program Files\Git\bin\bash.exe" artillery/preparar_corrida.sh verificar
 & "C:\Program Files\Git\bin\bash.exe" artillery/preparar_corrida.sh reiniciar
 ```
+
+**Ejecutar en Linux o macOS:**
+
 ```bash
-# Linux o macOS
 bash artillery/preparar_corrida.sh verificar
+bash artillery/preparar_corrida.sh reiniciar
 ```
 
-**Medido:** con una silla reservada, `verificar` falla (1.999 libres, mínimo 2.000). `reiniciar` la devuelve a 2.000 y el evento agotado sigue con sus 40 reservas.
+**Medido:** cuando una silla está reservada, `verificar` falla porque encuentra 1.999 sillas libres, por debajo del mínimo de 2.000. Al ejecutar `reiniciar`, la silla vuelve a estar disponible y el evento agotado conserva sus 40 reservas.
 
 ### 10.7 Escenario de errores controlados
 
-`artillery/errores.yml` genera durante 7 minutos tráfico con respuestas 200, 401, 403, 404 y 500 (un 10 % de las peticiones va a `/error`). No reserva sillas, así que no necesita reiniciar los datos. Sirve para comprobar el monitor de errores 5xx ([8.2](#82-guía-de-alertas)).
+El archivo `artillery/errores.yml` genera durante 7 minutos tráfico con respuestas 200, 401, 403, 404 y 500. Un 10 % de las peticiones se dirige al endpoint `/error`. El escenario no reserva sillas, por lo que no necesita reiniciar los datos.
+
+Esta prueba permite comprobar el funcionamiento del monitor de errores 5xx ([8.2](#82-guía-de-alertas)).
+
+**Ejecutar:**
 
 ```powershell
 docker run --rm --network cluster-net -v "${PWD}/artillery:/scripts:ro" artilleryio/artillery:2.0.34 run /scripts/errores.yml
 ```
 
-Debes ver: en el reporte, 2.100 usuarios virtuales completados y 0 fallidos, y respuestas 200, 401, 403, 404 y 500. Un 5xx de entre 9 y 10 % supera el umbral de 5 %.
+**Resultados esperados:** el reporte debe mostrar 2.100 usuarios virtuales completados y 0 fallidos, además de respuestas 200, 401, 403, 404 y 500. La tasa de respuestas 5xx debe estar entre el 9 % y el 10 %, superando el umbral de alerta del 5 %.
 
-**Medido:** el aviso (> 2 %) llegó 1 min 46 s después de iniciar y la alerta (> 5 %) a los 2 min 46 s. La recuperación llegó 5 min 43 s después de terminar: el monitor promedia los últimos 5 minutos y espera 60 s antes de evaluar (`evaluation_delay`), así que se recupera cuando los últimos datos con errores salen de esa ventana. El detalle está en [10.10](#1010-resultados-medidos).
+**Medido:** el aviso (> 2 %) llegó 1 min 46 s después de iniciar y la alerta (> 5 %) a los 2 min 46 s. La recuperación llegó 5 min 43 s después de terminar. Esto ocurre porque el monitor promedia los últimos 5 minutos y espera 60 segundos antes de evaluar (`evaluation_delay`); por tanto, se recupera cuando los datos con errores salen de esa ventana.
+
+Los resultados detallados están en el apartado [10.10](#1010-resultados-medidos).
 
 ### 10.8 Simulación de caída de un backend
 
-<sub>👤 Responsable: Sharon Abella</sub>
+Esta prueba comprueba que HAProxy continúa distribuyendo las peticiones entre los backends disponibles cuando uno deja de funcionar y que Datadog genera las alertas correspondientes.
 
-Comprueba que HAProxy reparte entre los backends sanos cuando uno se cae y que Datadog avisa por correo. Dos formas: automática (con carga y horas medidas) y manual (para la demostración en vivo).
+Se contemplan dos formas de ejecución: automática, mediante un script que controla los tiempos de caída y recuperación, y manual, para realizar una demostración en vivo.
 
 **Antes de empezar**
-1. Todo sano: `bash artillery/preparar_corrida.sh verificar` (en Windows, con Git Bash).
-2. Abre el dashboard de Datadog (sección [8](#8-dashboard-y-monitores)) con el rango "Past 15 minutes" y el tablero de HAProxy en <http://localhost:8404/stats>.
-3. Comprueba que tu correo está en el canal del Team `haproxy-telematicos` ([8.4](#84-cómo-importar-en-datadog)).
 
-**Forma automática** (≈ 6 minutos y medio)
+1. Comprueba que el entorno esté sano: `bash artillery/preparar_corrida.sh verificar` (en Windows, mediante Git Bash).
+2. Abre el dashboard de Datadog (sección [8](#8-dashboard-y-monitores)) con el rango "Past 15 minutes" y el tablero de HAProxy en <http://localhost:8404/stats>.
+3. Comprueba que tu correo esté incluido en el canal del Team `haproxy-telematicos` ([8.4](#84-cómo-importar-en-datadog)).
+
+**Forma automática (aproximadamente 6 minutos y medio)**
+
+En Windows:
+
 ```powershell
 & "C:\Program Files\Git\bin\bash.exe" artillery/falla.sh
 ```
+
+En Linux o macOS:
+
 ```bash
-# Linux o macOS
 bash artillery/falla.sh
 ```
-Para otro backend: `BACKEND=backend2 bash artillery/falla.sh`. El script arranca una carga constante de solo lectura, detiene el backend en el minuto 2, lo inicia en el minuto 4 y al final imprime la línea de tiempo (UTC) y el reparto de peticiones. Si lo interrumpes, deja el backend encendido.
 
-**Forma manual** (carga con Artillery en una terminal, la caída en otra)
+Para seleccionar otro backend:
+
+```bash
+BACKEND=backend2 bash artillery/falla.sh
+```
+
+El script inicia una carga constante de solo lectura, detiene el backend en el minuto 2, lo inicia en el minuto 4 y al final imprime la línea de tiempo en UTC y el reparto de peticiones. Si se interrumpe la ejecución, el script deja el backend encendido.
+
+**Forma manual (carga con Artillery en una terminal y caída en otra)**
+
 ```powershell
-# Terminal 1: carga
+# Terminal 1: iniciar la carga
 docker run --rm --network cluster-net -v "${PWD}/artillery:/scripts:ro" artilleryio/artillery:2.0.34 run /scripts/falla.yml
-# Terminal 2: a los 2 minutos, apaga un backend; a los 4, enciéndelo
+
+# Terminal 2: a los 2 minutos, apagar un backend; a los 4, encenderlo
 docker stop backend1
 docker start backend1
 ```
@@ -827,48 +938,64 @@ docker start backend1
 | Dónde | Al apagar el backend | Al encenderlo |
 |---|---|---|
 | Tablero de HAProxy (8404) | `backend1` en rojo (`DOWN`) a los 5 o 6 s | Vuelve a verde (`UP`) en 4 a 9 s |
-| Dashboard, grupo "Estado" | El semáforo de `backend1` en rojo en 5 a 10 s | Vuelve a verde |
+| Dashboard, grupo "Estado" | El indicador de `backend1` en rojo en 5 a 10 s | Vuelve a verde |
 | Dashboard, grupo "Tráfico" | Las peticiones de `backend1` caen a 0 y las de los otros dos suben | Se reparten en tercios otra vez |
-| Correo | `[CRÍTICO] ... marcó backend1 como caído`, unos 60 s después de la orden | `[RECUPERADO]`, unos 60 s después de iniciarlo | después | `
+| Correo | `[CRÍTICO] ... marcó backend1 como caído`, aproximadamente 60 s después de la orden | `[RECUPERADO]`, aproximadamente 60 s después de iniciarlo |
 
-Si el correo no llega, revisa la carpeta de spam y comprueba el Team ([8.4](#84-cómo-importar-en-datadog)).
+Si el correo no llega, revisa la carpeta de spam y comprueba la configuración del Team ([8.4](#84-cómo-importar-en-datadog)).
 
-**Medido:** con 20 y 30 peticiones por segundo, el 99,98 % de las respuestas fue 200. Hubo un 502 por corrida y alguna petición de hasta 2 s, porque `timeout connect` es de 2 s y HAProxy tarda 5 o 6 s en sacar al backend del reparto.
+**Medido:** con 20 y 30 peticiones por segundo, el 99,98 % de las respuestas fue 200. Hubo un 502 por corrida y alguna petición de hasta 2 segundos, porque `timeout connect` está configurado en 2 segundos y HAProxy tarda entre 5 y 6 segundos en sacar al backend del reparto.
 
-**Si algo queda apagado:** `docker compose up -d` lo vuelve a levantar. Si HAProxy no lo marca `UP` al volver, reinicia HAProxy: `docker compose restart haproxy` ([sección 4](#4-despliegue-rápido)).
+**Si algo queda apagado:** `docker compose up -d` vuelve a levantar los servicios. Si HAProxy no marca el backend como `UP` al recuperarse, reinicia HAProxy:
+
+```bash
+docker compose restart haproxy
+```
+
+Consulta también la [sección 4](#4-despliegue-rápido).
 
 ### 10.9 Analizar una corrida con las métricas de Datadog
 
-`artillery/analizar_datadog.py` consulta a Datadog las métricas de una corrida y las compara en tres momentos: **antes**, **durante** y **después**. Genera un resumen en la consola, una página HTML con gráficas y archivos CSV y JSON. Corre en un contenedor de Python, así que no instala nada en el equipo.
+El script `artillery/analizar_datadog.py` consulta las métricas de una corrida en Datadog y las compara en tres momentos: **antes**, **durante** y **después**. Genera un resumen en la consola, una página HTML con gráficas y archivos CSV y JSON. Se ejecuta en un contenedor de Python, por lo que no requiere instalar dependencias en el equipo.
 
-**Requisitos:** `DD_API_KEY`, `DD_APP_KEY` y `DD_SITE` en `.env` ([7.1](#71-cuenta-y-variables-de-entorno)). El script solo lee esas tres variables y no las escribe en los reportes.
+**Requisitos:** las variables `DD_API_KEY`, `DD_APP_KEY` y `DD_SITE` deben estar configuradas en `.env` ([7.1](#71-cuenta-y-variables-de-entorno)). El script solo lee estas tres variables y no las escribe en los reportes.
+
+**Ejemplo de ejecución:**
 
 ```powershell
 docker run --rm -v "${PWD}:/app" -w /app python:3.14-slim python artillery/analizar_datadog.py --inicio 20:12:07 --fin 20:18:11 --falla-desde 20:14:07 --falla-hasta 20:16:07 --dia 2026-11-15 --test falla --titulo caida-backend1
 ```
 
+**Parámetros**
+
 | Parámetro | Qué hace |
 |---|---|
-| `--inicio` · `--fin` | Inicio y fin de la carga, en **UTC** (`HH:MM:SS` o `AAAA-MM-DDTHH:MM:SS`). `falla.sh` imprime estas horas; también están en los eventos "Started" y "Finished" de Datadog |
-| `--falla-desde` · `--falla-hasta` | Opcionales. Definen la fase «Durante» dentro de la corrida (la caída). Sin ellos, «Antes» y «Después» son los minutos previos y posteriores a la carga |
-| `--test` | Etiqueta `test:<nombre>` de Artillery. Agrega las métricas de Artillery de esa corrida |
-| `--margen` | Segundos antes y después de la carga (por defecto 180) |
-| `--dia` | Fecha UTC para las horas sin fecha (por defecto, hoy) |
-| `--titulo` | Nombre de la corrida (aparece en los archivos) |
+| `--inicio` · `--fin` | Inicio y fin de la carga, en **UTC** (`HH:MM:SS` o `AAAA-MM-DDTHH:MM:SS`). `falla.sh` imprime estas horas; también están en los eventos "Started" y "Finished" de Datadog. |
+| `--falla-desde` · `--falla-hasta` | Opcionales. Definen la fase «Durante» dentro de la corrida (la caída). Sin ellos, «Antes» y «Después» corresponden a los minutos previos y posteriores a la carga. |
+| `--test` | Etiqueta `test:<nombre>` de Artillery. Permite agregar las métricas de Artillery de esa corrida. |
+| `--margen` | Segundos antes y después de la carga (por defecto, 180). |
+| `--dia` | Fecha UTC para las horas sin fecha (por defecto, hoy). |
+| `--titulo` | Nombre de la corrida que aparece en los archivos generados. |
 
-**Qué entrega** (en `reportes_datadog/`):
+**Archivos generados en `reportes_datadog/`**
+
 - `*.html`: página con una gráfica por métrica y las fases sombreadas.
-- `*_fases.csv`: promedio, mínimo y máximo por fase. `*_series.csv`: todos los puntos. `*.json`: resumen.
+- `*_fases.csv`: promedio, mínimo y máximo por fase.
+- `*_series.csv`: todos los puntos recopilados.
+- `*.json`: resumen de los resultados.
 
-**Qué incluye:** tráfico, distribución, errores, latencia, CPU y memoria de los backends, PostgreSQL y Artillery. Calcula tres indicadores: el reparto de peticiones entre backends (%), las respuestas 5xx sobre las peticiones de HAProxy (%) y la duración media de las peticiones en la aplicación. Lista además los eventos de la ventana (inicio y fin de Artillery, Docker y alertas de los monitores) con la hora UTC y la hora de Cali.
+**Qué incluye:** tráfico, distribución, errores, latencia, CPU y memoria de los backends, PostgreSQL y Artillery. También calcula tres indicadores: el reparto de peticiones entre backends (%), las respuestas 5xx sobre las peticiones de HAProxy (%) y la duración media de las peticiones en la aplicación. Además, lista los eventos de la ventana (inicio y fin de Artillery, Docker y alertas de los monitores) con la hora UTC y la hora de Cali.
 
-**Cómo leerlo**
-- Un asterisco (`*`) marca una fase con menos de la mitad de muestras que otras series: el valor no es representativo, por ejemplo cuando el contenedor estaba detenido.
-- «Sin datos» no siempre es un error: `artillery.http.codes.404` solo existe si hubo 404.
-- Las métricas más recientes tardan uno o dos minutos en llegar a Datadog. Si analizas justo al terminar, vuelve a correr el análisis.
-- La API de consulta de Datadog tiene un límite de peticiones por hora; el script hace unas 33 por corrida.
+**Cómo leer los resultados**
+
+- Un asterisco (`*`) marca una fase con menos de la mitad de muestras que otras series. El valor puede no ser representativo, por ejemplo, cuando el contenedor estaba detenido.
+- «Sin datos» no siempre significa que exista un error: `artillery.http.codes.404` solo aparece si hubo respuestas 404.
+- Las métricas más recientes pueden tardar uno o dos minutos en llegar a Datadog. Si analizas justo al terminar, vuelve a ejecutar el análisis después de esperar.
+- La API de consulta de Datadog tiene un límite de peticiones por hora; el script realiza aproximadamente 33 por corrida.
 
 ### 10.10 Resultados medidos
+
+En este apartado se reúnen los resultados obtenidos en las pruebas de errores controlados y caída de un backend.
 
 **Errores controlados** (`errores.yml`, 7 minutos, 5 usuarios virtuales por segundo)
 
@@ -881,7 +1008,9 @@ docker run --rm -v "${PWD}:/app" -w /app python:3.14-slim python artillery/anali
 | Duración media en la aplicación | 50 a 57 ms (3 a 5 ms antes de la prueba) |
 | CPU por backend · memoria | ≈ 0,12 núcleos de 1 · ≈ 101 MB de 384 |
 
-| Evento del monitor de 5xx | Hora (UTC) | Tiempo |
+**Eventos del monitor de 5xx**
+
+| Evento | Hora (UTC) | Tiempo |
 |---|:---:|---|
 | Inicio de la corrida | 17:39:35 | |
 | `[Warn]` > 2 % | 17:41:21 | 1 min 46 s tras el inicio |
@@ -889,7 +1018,7 @@ docker run --rm -v "${PWD}:/app" -w /app python:3.14-slim python artillery/anali
 | Fin de la corrida | 17:46:38 | |
 | `[Recovered]` | 17:52:21 | 5 min 43 s tras el fin |
 
-**Caída de `backend1`** (`falla.sh`, 20 peticiones por segundo; en la fase «Antes» el calentamiento de 30 s promedia 17 req/s y no 20)
+**Caída de `backend1`** (`falla.sh`, 20 peticiones por segundo; en la fase «Antes», el calentamiento de 30 segundos promedia 17 req/s y no 20).
 
 | Evento | Hora (UTC) | Tiempo |
 |---|:---:|---|
@@ -901,17 +1030,136 @@ docker run --rm -v "${PWD}:/app" -w /app python:3.14-slim python artillery/anali
 | HAProxy lo marca `UP` | 20:16:11 | 4 s tras la orden |
 | `[Recovered]` en Datadog | 20:17:07 | 60 s tras la orden |
 
+**Comparación de métricas**
+
 | Indicador | Antes | Durante | Después |
 |---|:---:|:---:|:---:|
 | Reparto de peticiones `backend1` · `backend2` · `backend3` (%) | 33 · 33 · 33 | 1 · 49 · 49 | 31 · 34 · 34 |
 | Conexiones a PostgreSQL (% del máximo) | 25 | 17 | 25 |
 | Latencia p95 de Artillery (ms) | 9,3 | 175,7 | 7,9 |
 
-Con `backend1` caído el servicio no se interrumpió: 6.974 de 6.975 respuestas fueron 200 y hubo un 502. Las conexiones a PostgreSQL bajan de 25 % a 17 % porque un backend con 2 workers de 4 hilos tiene 8 conexiones, y vuelven al subir. El p95 «Durante» sube porque un solo intervalo de 10 s llegó a unos 2.019 ms. Es coherente con `timeout connect 2s` de HAProxy (README, 5.6), pero es una inferencia, no se comprobó.
+Con `backend1` caído, el servicio no se interrumpió: 6.974 de 6.975 respuestas fueron 200 y hubo un 502. Las conexiones a PostgreSQL bajaron de 25 % a 17 % porque un backend con 2 workers de 4 hilos tiene 8 conexiones, y volvieron a subir cuando se recuperó. El p95 de la fase «Durante» aumentó porque un intervalo de 10 segundos llegó aproximadamente a 2.019 ms. Esto es coherente con `timeout connect 2s` de HAProxy (README, 5.6), aunque no se comprobó que esa fuera la causa directa.
 
-### 10.11 Revisión de secretos antes de entregar
+### 10.11 Pruebas de pausas entre solicitudes
 
-Comprueba que ninguna clave real quedó en el historial de Git, en cualquier rama. No imprime los valores.
+Se comparan tres escenarios con la misma cantidad de usuarios virtuales y peticiones, pero con diferentes pausas entre las solicitudes: sin pausas, pausas aleatorias de 1 a 3 segundos y pausas de 5 segundos. El objetivo es observar cómo cambia el ritmo de solicitudes cuando los usuarios permanecen más tiempo entre una acción y otra.
+
+**Resultados de Artillery**
+
+| Indicador | Sin pausas | Pausas de 1 a 3 s | Pausas de 5 s |
+|---|---:|---:|---:|
+| Peticiones totales | 10.140 | 10.140 | 10.140 |
+| Usuarios virtuales completados | 780 | 780 | 780 |
+| Usuarios virtuales fallidos | 0 | 0 | 0 |
+| Respuestas HTTP 200 | 10.140 | 10.140 | 10.140 |
+| Solicitudes por segundo | 21 | 18 | 16 |
+| Latencia media (ms) | 59,1 | 76,2 | 81,4 |
+| Latencia p50 (ms) | 6 | 7 | 7 |
+| Latencia p95 (ms) | 383,8 | 539,2 | 539,2 |
+| Latencia p99 (ms) | 854,2 | 1.274,3 | 1.274,3 |
+
+En los tres escenarios se completaron las 10.140 peticiones sin errores y todos los usuarios virtuales finalizaron correctamente. La diferencia principal estuvo en el ritmo de solicitudes: sin pausas se alcanzaron 21 solicitudes por segundo; con pausas de 1 a 3 segundos, 18; y con pausas de 5 segundos, 16.
+
+Las pausas representan el tiempo que el usuario virtual espera antes de continuar con la siguiente acción. Por eso, afectan el ritmo de generación de tráfico y la duración de las sesiones, pero no deben interpretarse como tiempo de respuesta del servidor.
+
+**Distribución de las peticiones**
+
+En cada escenario se realizaron 3.120 consultas de cartelera, 3.120 consultas de eventos, 780 inicios de sesión y 3.120 consultas de sillas por zona. Esto permite comparar los escenarios manteniendo la misma cantidad y distribución de operaciones.
+
+**Conclusión**
+
+Los resultados muestran que, al aumentar el tiempo de espera entre solicitudes, disminuye la cantidad de peticiones generadas por segundo. Sin embargo, los tres escenarios completaron la carga sin respuestas distintas de HTTP 200 ni usuarios virtuales fallidos. La latencia global también incluye los tiempos de inicio de sesión, por lo que no debe atribuirse directamente a las pausas configuradas.
+
+### 10.12 Pruebas de concurrencia en reservas
+
+Se realizaron dos pruebas para comprobar el comportamiento de las reservas cuando varias solicitudes llegan al mismo tiempo:
+
+- **Misma silla:** 50 solicitudes intentan reservar simultáneamente la silla 2051.
+- **Sillas diferentes:** 50 solicitudes intentan reservar 50 sillas distintas, identificadas en el archivo `sillas.csv`.
+
+Ambos escenarios utilizan una sesión autenticada compartida para generar las solicitudes. Por tanto, representan 50 intentos concurrentes de reserva realizados con la misma sesión, no 50 usuarios diferentes.
+
+**Ejecución**
+
+Desde Git Bash, se ejecuta cada escenario con:
+
+```bash
+ESCENARIO=concurrente.yml bash artillery/concurrencia/concurrencia.sh
+```
+
+```bash
+ESCENARIO=distribuida.yml bash artillery/concurrencia/concurrencia.sh
+```
+
+El script comprueba las condiciones iniciales, ejecuta Artillery y muestra el estado de los backends y de las sillas al finalizar. La prueba de sillas diferentes requiere que los identificadores del archivo `sillas.csv` estén disponibles antes de ejecutarla.
+
+**Resultados de Artillery**
+
+| Indicador | Misma silla | Sillas diferentes |
+|---|---:|---:|
+| Solicitudes | 50 | 50 |
+| Respuestas HTTP 201 | 1 | 50 |
+| Respuestas HTTP 409 | 49 | 0 |
+| Usuarios virtuales completados | 50 | 50 |
+| Usuarios virtuales fallidos | 0 | 0 |
+| Solicitudes por segundo | 50 | 50 |
+| Latencia media (ms) | 15,3 | 14,8 |
+| Latencia p50 (ms) | 7,9 | 7,9 |
+| Latencia p95 (ms) | 44,3 | 61 |
+| Latencia p99 (ms) | 56,3 | 74,4 |
+| Latencia máxima (ms) | 76 | 77 |
+
+**Comportamiento al reservar la misma silla**
+
+De los 50 intentos concurrentes, uno obtuvo una respuesta HTTP 201 y los otros 49 recibieron HTTP 409, que indica que la silla ya no estaba disponible. Esto demuestra que no se permitió completar más de una reserva para el mismo asiento.
+
+**Comportamiento al reservar sillas diferentes**
+
+Las 50 solicitudes obtuvieron HTTP 201. Esto indica que el sistema pudo procesar correctamente las reservas concurrentes cuando cada solicitud correspondía a una silla distinta.
+
+**Resultados observados en Datadog**
+
+En ambas pruebas, los tres backends permanecieron disponibles y recibieron una proporción equilibrada del tráfico, cercana a un tercio por backend. No se observaron respuestas 5xx ni acumulación de solicitudes en las colas de HAProxy.
+
+El uso de CPU y memoria se mantuvo bajo durante las dos pruebas. Las conexiones a PostgreSQL permanecieron alrededor del 25 % de su máximo configurado. El análisis no registró datos de métricas de bloqueos de tablas; esto no permite concluir que no se hayan producido bloqueos breves a nivel de filas.
+
+**Conclusión**
+
+Las pruebas muestran que el sistema maneja correctamente los intentos concurrentes de reserva: impide que varias solicitudes reserven la misma silla y permite reservar simultáneamente sillas diferentes. Además, durante las ejecuciones los tres backends se mantuvieron disponibles, el tráfico se distribuyó de forma equilibrada y no se registraron errores 5xx.
+
+### 10.13 Comparación de workers de Gunicorn
+
+Compara 1, 2 y 4 workers por backend con la misma carga. El archivo `artillery/workers.yml` aumenta progresivamente de 2 a 12 usuarios virtuales por segundo durante 6 minutos. Cada usuario inicia sesión una vez y realiza 4 consultas de solo lectura, por lo que no modifica los datos.
+
+El script `artillery/workers.sh` recrea los backends con el número de workers indicado, reinicia HAProxy ([sección 4](#4-despliegue-rápido)) y lanza la rampa. No modifica `.env`: pasa `BACKEND1_WORKERS`, `BACKEND2_WORKERS` y `BACKEND3_WORKERS` solo durante la ejecución.
+
+**Ejecutar en Windows:**
+
+```powershell
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 2
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 1
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 4
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 2 repeticion
+& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh restaurar
+```
+
+**Ejecutar en Linux o macOS:**
+
+```bash
+bash artillery/workers.sh 2
+```
+
+Al terminar, el script imprime el comando de [`analizar_datadog.py`](#109-analizar-una-corrida-con-las-métricas-de-datadog) con las horas de la corrida. El análisis divide la rampa en tres tercios de 2 minutos (Baja ≈ 3,7, Media ≈ 7 y Alta ≈ 10,3 usuarios por segundo). Se repite la configuración de 2 workers para medir cuánto varía una corrida respecto a otra.
+
+**Límites del experimento:** todo se ejecuta en un solo equipo. Los backends comparten CPU con Artillery, PostgreSQL y el Agent, y cada backend tiene un límite de 1 CPU y 384 MB de memoria. Se realiza una corrida por configuración, excepto para 2 workers, que se repite.
+
+**Resultados:** pendientes de completar con las corridas y su análisis de Datadog.
+
+### 10.14 Revisión de secretos antes de entregar
+
+Comprueba que ninguna clave real haya quedado en el historial de Git, en cualquiera de las ramas. El procedimiento no imprime los valores de las claves.
+
+**Ejecutar en PowerShell:**
 
 ```powershell
 foreach ($n in 'DD_API_KEY','DD_APP_KEY','POSTGRES_PASSWORD','DD_POSTGRES_PASSWORD','SECRET_KEY') {
@@ -921,34 +1169,17 @@ foreach ($n in 'DD_API_KEY','DD_APP_KEY','POSTGRES_PASSWORD','DD_POSTGRES_PASSWO
   $hits = git rev-list --all | ForEach-Object { git grep -l -F -e $v $_ 2>$null }
   if ($hits) { "${n}: ENCONTRADA -> " + (($hits | Select-Object -First 5) -join ', ') } else { "${n}: no aparece en ningún commit" }
 }
+
 docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:latest detect --source /repo --log-opts="--all" --redact
 ```
-Debes ver: `no aparece en ningún commit` y `no leaks found`. Una clave de menos de 8 caracteres no se puede buscar en el historial. Si una clave aparece, hay que **revocarla** en Datadog y crear otra; no se reescribe el historial.
 
-`.gitleaks.toml` exime solo los hashes SHA-256 de integridad que guardan los `manifest.json` e `inicio.json` de las campañas de Artillery. Se hace por línea y no por tipo de valor: una clave real de 64 caracteres hexadecimales (como `SECRET_KEY`) se seguiría detectando.
----
+**Resultado esperado:** `no aparece en ningún commit` y `no leaks found`. Una clave de menos de 8 caracteres no se puede buscar en el historial mediante este procedimiento.
 
-### 10.12 Comparación de workers de Gunicorn
+Si una clave aparece, hay que **revocarla** en Datadog y crear otra; no se debe reescribir el historial para ocultar que estuvo expuesta.
 
-Compara 1, 2 y 4 workers por backend con la misma carga. `artillery/workers.yml` sube de 2 a 12 usuarios virtuales por segundo en 6 minutos; cada uno inicia sesión una vez y hace 4 consultas de solo lectura, así que no modifica datos. `artillery/workers.sh` recrea los backends con el número de workers indicado, reinicia HAProxy ([sección 4](#4-despliegue-rápido)) y lanza la rampa. No modifica `.env`: pasa `BACKEND1_WORKERS`, `BACKEND2_WORKERS` y `BACKEND3_WORKERS` solo durante la ejecución.
+El archivo `.gitleaks.toml` exime únicamente los hashes SHA-256 de integridad que guardan los `manifest.json` e `inicio.json` de las campañas de Artillery. La excepción se aplica por línea y no por tipo de valor: una clave real de 64 caracteres hexadecimales (como `SECRET_KEY`) se seguiría detectando.
 
-```powershell
-& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 2
-& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 1
-& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 4
-& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh 2 repeticion
-& "C:\Program Files\Git\bin\bash.exe" artillery/workers.sh restaurar
-```
-```bash
-# Linux
-bash artillery/workers.sh 2
-```
-
-Al terminar, el script imprime el comando de [`analizar_datadog.py`](#109-analizar-una-corrida-con-las-métricas-de-datadog) con las horas de la corrida. El análisis divide la rampa en tres tercios de 2 minutos (Baja ≈ 3,7, Media ≈ 7 y Alta ≈ 10,3 usuarios por segundo). Se repite 2 workers para medir cuánto varía una corrida de otra.
-
-**Límites del experimento:** todo corre en un solo equipo (los backends comparten CPU con Artillery, PostgreSQL y el Agent) y cada backend tiene un límite de 1 CPU y 384 MB. Es una corrida por configuración, y dos para 2 workers.
-
-**Resultados:** _(se completan con las corridas)_
+> **📄 Registro detallado de pruebas:** Para consultar el desarrollo de las pruebas, los resultados completos y las evidencias obtenidas, revisa el documento [Registro de pruebas](docs/evidencias/pruebas/Registro-de-pruebas.md).
 
 ## 11. Solución de problemas
 
