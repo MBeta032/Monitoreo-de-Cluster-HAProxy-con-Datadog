@@ -1,0 +1,43 @@
+config:
+  target: "http://haproxy:8080"
+  processor: "./concurrencia.js"
+
+  phases:
+    - duration: 1
+      arrivalCount: 50
+      name: "50 usuarios - misma silla"
+
+  plugins:
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "project:haproxy-cluster"
+          - "test:concurrencia_misma_silla"
+
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+before:
+  flow:
+    - post:
+        url: "/api/login"
+        json:
+          email: "demo@taquilla.test"
+          password: "Taquilla2026!"
+        afterResponse: "capturarCookie"
+        capture:
+          - json: "$.csrf_token"
+            as: "csrfToken"
+
+scenarios:
+  - name: "Reservas concurrentes"
+    flow:
+      - post:
+          url: "/api/events/2/seats/2051/reserve"
+          name: "reserva_silla"
+          headers:
+            Cookie: "{{ sessionCookie }}"
+            X-CSRF-Token: "{{ csrfToken }}"
