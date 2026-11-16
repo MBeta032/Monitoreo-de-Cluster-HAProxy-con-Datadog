@@ -24,6 +24,7 @@ import os
 import re
 import sys
 import time
+import socket
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -165,12 +166,12 @@ def pedir(base: str, claves: dict[str, str], ruta: str, params: dict) -> dict:
                  "DD-APPLICATION-KEY": claves["DD_APP_KEY"],
                  "Accept": "application/json"},
     )
-    for intento in (1, 2):
+    for intento in (1, 4):
         try:
-            with urlopen(req, timeout=30) as r:
+            with urlopen(req, timeout=90) as r:
                 return json.loads(r.read().decode("utf-8"))
         except HTTPError as e:
-            if e.code == 429 and intento == 1:  # límite de consultas: una espera y un reintento
+            if e.code == 429 and intento < 3:  # límite de consultas: una espera y un reintento
                 try:
                     espera = int(e.headers.get("X-RateLimit-Reset", "10"))
                 except ValueError:
@@ -185,6 +186,15 @@ def pedir(base: str, claves: dict[str, str], ruta: str, params: dict) -> dict:
                 raise ErrorDatadog("HTTP 429: límite de consultas de la API; espera unos minutos.")
             raise ErrorDatadog(f"HTTP {e.code} al consultar {ruta}")
         except URLError as e:
+            if isinstance(e.reason, (TimeoutError, socket.timeout)):
+                if intento < 3:
+                    espera = intento * 5
+                    print(
+                        f"Timeout de conexión. "
+                        f"Reintento {intento + 1}/3 en {espera} segundos..."
+                    )
+                    time.sleep(espera)
+                    continue
             raise ErrorDatadog(f"No se pudo conectar con Datadog: {e.reason}")
     raise ErrorDatadog("Sin respuesta")
 
