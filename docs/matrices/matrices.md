@@ -17,8 +17,8 @@ Evaluación y selección de alternativas para el clúster HAProxy + Datadog de l
 
 | Tipo de criterio | Regla | Ejemplo |
 |---|---|---|
-| Medido, menor es mejor (latencia, bytes) | 5 al mejor; se resta 1 punto por cada 10 % que la alternativa quede por encima del mejor; mínimo 1 | p95 de 108,9 ms frente a 106,7 ms: 2,1 % peor, sigue en 5 |
-| Medido, mayor es mejor (éxito, throughput) | 5 al mejor; se resta 1 punto por cada 10 % por debajo; mínimo 1 | 38,6 % de respuestas 200 frente a 52,5 %: 26 % peor, queda en 2 |
+| Medido, menor es mejor (latencia, bytes) | 5 al mejor; se resta 1 punto por cada 10 % que la alternativa quede por encima del mejor, redondeado al entero más cercano; mínimo 1 | p95 de 108,9 ms frente a 106,7 ms: 2,1 % peor, sigue en 5 |
+| Medido, mayor es mejor (éxito, throughput) | 5 al mejor; se resta 1 punto por cada 10 % por debajo, redondeado al entero más cercano; mínimo 1 | 38,6 % de respuestas 200 frente a 52,5 %: 26 % peor (2,6 → 3 puntos menos), queda en 2 |
 | Recurso con límite duro (memoria, conexiones, CPU) | Fracción del límite: 5 si < 20 %, 4 si < 40 %, 3 si < 60 %, 2 si < 80 %, 1 si más | 186,6 MB de 384 MB = 48,6 %, queda en 3 |
 | Cualitativo (documentación o juicio) | Puntaje en celda azul con la frase de la fuente en un comentario. Si no se midió, dice "estimado" | `leastconn ... not very well suited for ... HTTP` [1] |
 
