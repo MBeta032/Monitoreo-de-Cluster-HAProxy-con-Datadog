@@ -175,6 +175,7 @@ flowchart LR
 │   └── analizar_datadog.py  # Informe de métricas de Datadog por corrida (antes, durante, después)
 └── docs/
     ├── diagramas/           # Diagramas de arquitectura
+    ├── presentacion/        # Presentación final (presentacion-proyecto8-final.pptx)
     └── evidencias/          # Capturas de las pruebas, una subcarpeta por parte
 ```
 
