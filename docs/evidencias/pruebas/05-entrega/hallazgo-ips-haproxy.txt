@@ -1,0 +1,20 @@
+# Hallazgo: HAProxy conserva IPs viejas tras reiniciar backends (sin 'resolvers' en haproxy.cfg)
+
+## Antes de reiniciar HAProxy · 20:23:10Z / 15:23:10 local
+contenedor backend1 IP=172.18.0.5 (StartedAt 20:11:43Z)
+contenedor backend2 IP=172.18.0.4 (StartedAt 20:11:43Z)
+contenedor backend3 IP=172.18.0.6 (StartedAt 20:16:59Z)
+servidor HAProxy backend1 -> 172.18.0.4:5000 (UP)
+servidor HAProxy backend2 -> 172.18.0.6:5000 (UP)
+servidor HAProxy backend3 -> 172.18.0.5:5000 (UP)
+
+Lectura: tras 'todos caídos' (stop/start de los 3 a las 20:11) Docker reasignó las IPs. El servidor 'backend1' de HAProxy apunta al contenedor backend2, 'backend2' al backend3 y 'backend3' al backend1. Las etiquetas por servidor en stats y en Datadog quedan cruzadas hasta reiniciar HAProxy.
+
+## Corrección (plan B de A-12, con los 3 backends arriba): docker compose restart haproxy · 20:23:15Z / 15:23:15 local
+ Container haproxy Restarting 
+ Container haproxy Started 
+
+## Después · 20:23:23Z / 15:23:23 local
+servidor HAProxy backend1 -> 172.18.0.5:5000 (UP)
+servidor HAProxy backend2 -> 172.18.0.4:5000 (UP)
+servidor HAProxy backend3 -> 172.18.0.6:5000 (UP)

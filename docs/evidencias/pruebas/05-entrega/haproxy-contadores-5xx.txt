@@ -1,0 +1,17 @@
+# Contadores de HAProxy (stats CSV, puerto 8404) · 20:22:52Z / 15:22:52 local
+HAProxy arrancó a las 20:06:23Z: los contadores acumulan smoke de validación (20:09-20:10), 'todos caídos' (20:11-20:12) y '2 backends a 10 VU/s' (20:14-20:17).
+Instantánea intermedia a las 20:16:02Z (durante la prueba de 2 backends):
+pxname,svname,status,stot,req_tot,hrsp_5xx,econ,eresp,wretr,wredis
+fe_web,FRONTEND,OPEN,373,441,107,,,,
+be_app,backend1,DOWN,130,106,0,0,0,0,0
+be_app,backend2,DOWN,77,75,0,0,2,0,1
+be_app,backend3,DOWN,130,112,0,0,0,0,1
+be_app,BACKEND,DOWN,441,400,107,106,2,0,2
+
+Instantánea final:
+pxname,svname,status,addr,stot,req_tot,hrsp_5xx,econ,eresp,wretr,wredis
+fe_web,FRONTEND,OPEN,,580,915,288,,,,
+be_app,backend1,UP,172.18.0.4:5000,236,220,0,0,16,0,0
+be_app,backend2,UP,172.18.0.6:5000,84,82,0,0,2,0,1
+be_app,backend3,UP,172.18.0.5:5000,326,325,0,0,0,0,1
+be_app,BACKEND,UP,,915,915,288,271,18,0,2

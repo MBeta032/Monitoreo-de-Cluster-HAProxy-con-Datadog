@@ -1,0 +1,23 @@
+# Arranque de escenarios con las variables de .env (sin -e), tras agregar JJ_EMAIL y JJ_PASSWORD
+
+## normal.yml · inicio 20:26:23Z / 15:26:24 local (se corta a los ~65 s)
+corte 20:27:29Z / 15:27:29 local
+JJ_CREDENCIALES_AUSENTES en la salida: 0
+Informes intermedios (cada 10 s):
+
+## pico.yml · inicio 20:27:29Z / 15:27:29 local (se corta a los ~65 s)
+corte 20:28:35Z / 15:28:35 local
+JJ_CREDENCIALES_AUSENTES en la salida: 0
+Informes intermedios (cada 10 s):
+
+## pico-datadog.yml: no se lanza completo (lo coordina el Orquestador). Se valida la inyección de variables con la copia corta (5 s, test:validacion-pico) sin -e · 20:28:35Z / 15:28:35 local
+http.codes.200: ................................................................ 20
+jj.flujo_ok: ................................................................... 5
+jj.login_ok: ................................................................... 5
+plugins.metrics-by-endpoint.login.codes.200: ................................... 5
+vusers.completed: .............................................................. 5
+vusers.created: ................................................................ 5
+vusers.created_by_name.Taquilla autenticada: ................................... 5
+vusers.failed: ................................................................. 0
+vusers.session_length:
+fin 20:29:05Z / 15:29:05 local
