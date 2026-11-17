@@ -23,3 +23,6 @@ __pycache__/
 .venv-jj/
 __pycache__/
 *.bak
+
+# Salidas nuevas de Artillery (lo ya versionado en esta carpeta se conserva)
+artillery/resultados/

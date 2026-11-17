@@ -1,0 +1,79 @@
+# pico-datadog.yml - Prueba P2: pico de carga con métricas en Datadog (versión corta para la demo).
+# Basado en pico.yml (Juan José: mismo flujo autenticado, procesador y máximo de 10 VU/s) + bloque
+# publish-metrics de smoke-datadog.yml (Sharon). pico.yml no se modifica.
+#
+# Fases (240 s = 4 min en total; VU/s = usuarios virtuales nuevos por segundo):
+#   1. calentamiento   30 s a 2 VU/s
+#   2. subida          30 s de 2 a 10 VU/s
+#   3. meseta (pico)  120 s a 10 VU/s
+#   4. bajada          30 s de 10 a 2 VU/s
+#   5. después         30 s a 2 VU/s
+# Cada VU inicia sesión una vez (unos 300 ms de CPU por login) y hace 3 consultas. No reserva sillas.
+#
+# Métricas: artillery.*{test:pico-datadog} por DogStatsD al Agent (sin API key en este contenedor)
+# y eventos "Started"/"Finished" con el título "Artillery pico-datadog".
+# Requiere JJ_EMAIL y JJ_PASSWORD (cuenta de prueba del README §6.1). Comando en docs/pruebas/plan-de-pruebas.md.
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - duration: 30
+      arrivalRate: 2
+      name: "calentamiento 2 VU/s"
+    - duration: 30
+      arrivalRate: 2
+      rampTo: 10
+      name: "subida a 10 VU/s"
+    - duration: 120
+      arrivalRate: 10
+      name: "meseta 10 VU/s"
+    - duration: 30
+      arrivalRate: 10
+      rampTo: 2
+      name: "bajada a 2 VU/s"
+    - duration: 30
+      arrivalRate: 2
+      name: "despues 2 VU/s"
+  processor: "./taquilla.js"
+  http:
+    timeout: 30
+  plugins:
+    metrics-by-endpoint:
+      # Una métrica por nombre de petición (login, eventos, sillas, mis_reservas), no una por URL.
+      useOnlyRequestNames: true
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:pico-datadog"
+        event:
+          title: "Artillery pico-datadog"
+          text: "Prueba P2: pico de carga (4 min, máximo 10 VU/s) con métricas en Datadog"
+          priority: normal
+          tags:
+            - "test:pico-datadog"
+
+scenarios:
+  - name: "Taquilla autenticada"
+    beforeScenario: "iniciar"
+    flow:
+      - post:
+          url: "/api/login"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+          afterResponse: "login"
+          name: "login"
+      - get:
+          url: "/api/events"
+          afterResponse: "eventos"
+          name: "eventos"
+      - get:
+          url: "/api/events/{{ event_id }}/seats"
+          afterResponse: "sillas"
+          name: "sillas"
+      - get:
+          url: "/api/reservations"
+          afterResponse: "misReservas"
+          name: "mis_reservas"

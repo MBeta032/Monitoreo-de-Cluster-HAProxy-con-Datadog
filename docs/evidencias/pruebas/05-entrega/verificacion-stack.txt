@@ -1,0 +1,57 @@
+# Verificación del stack · 2026-11-16T20:07:14Z UTC / 2026-11-16 20:07:14 local
+NAME            IMAGE                                 COMMAND                  SERVICE         CREATED              STATUS                        PORTS
+backend1        haproxy-telematicos-backend:2.0.0     "gunicorn -c gunicor…"   backend1        3 days ago           Up 54 seconds (healthy)       5000/tcp
+backend2        haproxy-telematicos-backend:2.0.0     "gunicorn -c gunicor…"   backend2        3 days ago           Up 53 seconds (healthy)       5000/tcp
+backend3        haproxy-telematicos-backend:2.0.0     "gunicorn -c gunicor…"   backend3        3 days ago           Up 54 seconds (healthy)       5000/tcp
+datadog-agent   registry.datadoghq.com/agent:7.85.1   "/bin/entrypoint.sh"     datadog-agent   About a minute ago   Up About a minute (healthy)   8125/udp, 8126/tcp
+db              postgres:17.11                        "docker-entrypoint.s…"   db              4 days ago           Up About a minute (healthy)   5432/tcp
+haproxy         haproxy:2.6                           "docker-entrypoint.s…"   haproxy         About a minute ago   Up 52 seconds                 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 127.0.0.1:8404->8404/tcp
+
+== Servicios ==
+db: healthy
+backend1: healthy
+backend2: healthy
+backend3: healthy
+haproxy: running
+datadog-agent: running
+== Backends en HAProxy ==
+backend1: UP
+backend2: UP
+backend3: UP
+== Sillas por evento ==
+Concierto Caña y Clave | available | 1999
+Concierto Caña y Clave | reserved | 1
+Obra: El Cuentero del Pacífico | available | 100
+Noche de jazz | available | 100
+Cuentos de medianoche | reserved | 40
+Sillas libres en el evento de venta flash: 1999 (mínimo 2000)
+ERROR: faltan sillas libres; corre: artillery/preparar_corrida.sh reiniciar
+rc=1
+
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+70168a68d32c   datadog-agent   5.21%     251.9MiB / 4.742GiB   5.19%     451kB / 573kB     445MB / 13.4MB    52
+c811951387a8   haproxy         0.44%     76.51MiB / 4.742GiB   1.58%     85.9kB / 61.4kB   30.2MB / 0B       9
+0f2e22949a8e   backend2        0.19%     84.09MiB / 384MiB     21.90%    29.7kB / 41.3kB   69.6kB / 8.19kB   13
+13755ac80569   backend3        0.30%     84.48MiB / 384MiB     22.00%    29.1kB / 37.4kB   111kB / 0B        13
+20d88f8edd7c   backend1        0.20%     102.6MiB / 384MiB     26.73%    31.8kB / 45.5kB   34MB / 8.19kB     13
+a91ceeff3f46   db              0.03%     90.57MiB / 4.742GiB   1.87%     82.1kB / 76.3kB   71.8MB / 475kB    31
+
+## Tras 'reiniciar' (15:07:33 local / 20:07:33Z)
+== Servicios ==
+db: healthy
+backend1: healthy
+backend2: healthy
+backend3: healthy
+haproxy: running
+datadog-agent: running
+== Backends en HAProxy ==
+backend1: UP
+backend2: UP
+backend3: UP
+== Sillas por evento ==
+Concierto Caña y Clave | available | 2000
+Obra: El Cuentero del Pacífico | available | 100
+Noche de jazz | available | 100
+Cuentos de medianoche | reserved | 40
+Sillas libres en el evento de venta flash: 2000 (mínimo 2000)
+rc=0

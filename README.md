@@ -15,6 +15,9 @@
 
 ---
 
+> [!TIP]
+> **¿Primera vez y solo quieres verlo funcionando?** Ve directo al [despliegue rápido (sección 4)](#4-despliegue-rápido): paso a paso para Windows y macOS, sin instalar nada más que Docker y Git.
+
 ## Índice
 
 1. [Descripción y arquitectura](#1-descripción-y-arquitectura)
@@ -28,9 +31,6 @@
 9. [Pruebas de carga](#9-pruebas-de-carga)
 10. [Pruebas de punta a punta y simulación de caída](#10-pruebas-de-punta-a-punta-y-simulación-de-caída)
 11. [Solución de problemas](#11-solución-de-problemas)
-
-> [!TIP]
-> **¿Solo quieres ponerlo en marcha?** Revisa los [requisitos](#2-requisitos-previos) y sigue el [despliegue rápido](#4-despliegue-rápido).
 
 ---
 
@@ -53,10 +53,10 @@
 | Backends | Esteban |  ✅ Listo  |
 | Datadog Agent | Jhon | ✅ Listo |
 | Dashboard y monitores | Alan | ✅ Listo |
-| Pruebas de carga | Juan José | ⏳ Pendiente |
-| Integración, E2E y documentación | Sharon | ⏳ Pendiente |
+| Pruebas de carga | Juan José | ✅ Listo |
+| Integración, E2E y documentación | Sharon | ✅ Listo |
 
-<sub>Leyenda: ✅ Listo · 🚧 En curso · ⏳ Pendiente. Cada responsable actualiza su fila.</sub>
+<sub>Leyenda: ✅ Listo · 🚧 En curso · ⏳ Pendiente. Cada responsable actualiza su fila. Evidencias: carga en `docs/evidencias/carga-jj-20261114/` ([sección 9](#9-pruebas-de-carga)); integración y pruebas de punta a punta en `docs/evidencias/pruebas/` ([sección 10](#10-pruebas-de-punta-a-punta-y-simulación-de-caída)).</sub>
 
 ---
 
@@ -75,7 +75,7 @@ El proyecto es la **Taquilla Sucursal**, una página para reservar sillas en tea
 | `backend1` · `backend2` · `backend3` | La Taquilla: páginas web y API, con Flask + Gunicorn (la aplicación en Python y el servidor que la atiende con varios procesos) | `haproxy-telematicos-backend:2.0.0` (propia, [sección 6](#6-backends)) |
 | `db` | Base de datos PostgreSQL con eventos, sillas, usuarios y reservas | `postgres:17.11` (oficial) |
 | `datadog-agent` | Recoge métricas y logs y los envía a Datadog | `registry.datadoghq.com/agent:7.85.1` |
-| `artillery` | Genera carga de prueba contra HAProxy | Por definir ([sección 9](#9-pruebas-de-carga)) |
+| `artillery` | Genera carga de prueba contra HAProxy; solo corre cuando se lanza una prueba (perfil `tools`) | `artilleryio/artillery:2.0.34` (oficial, [secciones 9](#9-pruebas-de-carga) y [10](#10-pruebas-de-punta-a-punta-y-simulación-de-caída)) |
 
 ```mermaid
 flowchart LR
@@ -129,9 +129,8 @@ flowchart LR
 
 <sub>👤 Responsable: Manuel Betancurt · cada integrante agrega aquí sus archivos (solo agregar líneas)</sub>
 
-```
-.
 ```text
+.
 ├── docker-compose.yml       # Orquestación de todos los servicios (un bloque por dueño)
 ├── .env.example             # Plantilla de variables (copiar como .env)
 ├── .gitignore               # Archivos que Git no sube (incluye .env)
@@ -167,8 +166,8 @@ flowchart LR
 │       └── 03_datadog_user.sh # Usuario datadog de solo lectura para el Agent
 ├── artillery/
 │   ├── smoke-datadog.yml    # Prueba corta de la integración Artillery con Datadog (40 peticiones)
-    ├── workers.yml    # Rampa de 2 a 12 usuarios por segundo para comparar workers
-    ├── workers.sh     # Recrea los backends con 1, 2 o 4 workers y corre la rampa
+│   ├── workers.yml          # Rampa de 2 a 12 usuarios por segundo para comparar workers
+│   ├── workers.sh           # Recrea los backends con 1, 2 o 4 workers y corre la rampa
 │   ├── errores.yml          # Errores controlados 401, 403, 404 y 500 (7 min)
 │   ├── falla.yml            # Carga constante para la prueba de caída de un backend
 │   ├── falla.sh             # Detiene y vuelve a iniciar un backend durante la carga
@@ -195,37 +194,221 @@ flowchart LR
 
 <sub>👤 Responsable: Sharon Abella · versión inicial: Manuel Betancurt</sub>
 
-Pasos para levantar todo el proyecto en un equipo con Docker. Los comandos son de PowerShell (en Linux o macOS: `cp` en lugar de `Copy-Item` y `curl` en lugar de `curl.exe`).
+Guía paso a paso para poner el proyecto en marcha en un computador propio, **sin instalar nada más que Docker y Git**. Cada paso tiene un solo comando y dice qué **debes ver**. Los comandos son de **PowerShell** (Windows). En macOS se usa la app **Terminal**; cuando el comando cambia, la versión de macOS aparece justo debajo.
 
-1. Descargar el proyecto y entrar a la carpeta:
+> [!IMPORTANT]
+> El archivo `.env` guarda las claves. Nunca se sube a GitHub, no se envía por chat y no se muestra en pantalla al grabar o tomar capturas.
+
+### 4.1 Requisitos
+
+| Qué | Windows | macOS |
+|---|---|---|
+| Sistema | Windows 10 de 64 bits, versión 22H2 (compilación 19045), o Windows 11 de 64 bits, versión 23H2 (compilación 22631) o más nueva | La versión actual de macOS o una de las dos anteriores, en Mac con chip Apple o Intel |
+| Memoria RAM | Mínimo 8 GB (lo pide Docker Desktop) | Mínimo 4 GB (lo pide Docker Desktop); con 4 GB el proyecto completo puede quedarse corto, porque cada backend puede usar hasta 384 MB y además corren PostgreSQL, el Agent y Artillery |
+| Docker | [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/) con WSL 2 (el subsistema de Linux de Windows), versión 2.1.5 o más nueva, y la virtualización activada en la BIOS/UEFI | [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/) |
+| Git | [Git for Windows](https://git-scm.com/download/win): trae Git y **Git Bash** (la terminal que corre los scripts `.sh` de la [sección 10](#10-pruebas-de-punta-a-punta-y-simulación-de-caída)) | Git: se instala con `xcode-select --install`; la Terminal ya trae Bash |
+| Datadog | Cuenta de prueba gratis ([4.2](#42-cuenta-de-datadog-y-api-key)) | Igual |
+
+- **Windows Home:** la página de Docker nombra las ediciones Enterprise, Pro y Education y aclara que Home y Education solo corren contenedores Linux. Este proyecto solo usa contenedores Linux; esta guía se armó en Windows 11 Home con Docker Desktop 4.97.0 (Docker Compose v5.6.1).
+- **Linux (en una línea):** instala [Docker Engine](https://docs.docker.com/engine/install/) con el complemento Compose y Git desde el gestor de paquetes; los comandos son los mismos de macOS.
+- Requisitos de Docker Desktop consultados en docs.docker.com el **16 de noviembre de 2026**.
+
+Antes de seguir, abre **Docker Desktop** y espera a que diga que está corriendo (la ballena del menú deja de moverse).
+
+1. Comprobar Docker y Compose:
+   ```powershell
+   docker compose version
+   ```
+   Debes ver: `Docker Compose version v2...` o más nueva. Si sale un error de conexión, Docker Desktop todavía no ha terminado de abrir.
+2. Comprobar Git:
+   ```powershell
+   git --version
+   ```
+   Debes ver: `git version 2...`.
+3. Solo en Windows, comprobar Git Bash (se usa en la sección 10, no en esta guía):
+   ```powershell
+   & "C:\Program Files\Git\bin\bash.exe" --version
+   ```
+   Debes ver: `GNU bash, version ...`.
+
+### 4.2 Cuenta de Datadog y API key
+
+1. Crea una cuenta de prueba gratis en <https://www.datadoghq.com/> (botón de prueba gratis). Dura 14 días; la del grupo vence el 20 de noviembre de 2026 ([7.1](#71-cuenta-y-variables-de-entorno)).
+2. Al entrar, mira la dirección del navegador para saber tu **sitio** (va en `DD_SITE`):
+
+   | Si la dirección empieza por | `DD_SITE` es |
+   |---|---|
+   | `app.datadoghq.com` | `datadoghq.com` |
+   | `us3.datadoghq.com` | `us3.datadoghq.com` |
+   | `us5.datadoghq.com` | `us5.datadoghq.com` |
+   | `app.datadoghq.eu` | `datadoghq.eu` |
+   | `ap1.datadoghq.com` | `ap1.datadoghq.com` |
+
+3. Saca la **API key** (la clave con la que el Agent envía datos a tu cuenta): menú de tu usuario (abajo a la izquierda) → **Organization Settings → API Keys**. Copia la que viene creada o crea una con **New Key**.
+   Debes ver: una clave larga de letras y números. Guárdala solo en `.env` (paso 4.3).
+4. La **Application Key** es opcional: solo la usa `analizar_datadog.py` ([10.9](#109-analizar-una-corrida-con-las-métricas-de-datadog)). Se crea en **Organization Settings → Application Keys**.
+
+### 4.3 Descargar el proyecto y crear `.env`
+
+1. Descargar el proyecto:
    ```powershell
    git clone https://github.com/MBeta032/Monitoreo-de-Cluster-HAProxy-con-Datadog.git
+   ```
+   Debes ver: `Cloning into 'Monitoreo-de-Cluster-HAProxy-con-Datadog'...` y `done`.
+2. Entrar a la carpeta (todos los comandos siguientes se corren desde aquí):
+   ```powershell
    cd Monitoreo-de-Cluster-HAProxy-con-Datadog
    ```
-2. Crear el archivo de variables `.env` y generar la clave de sesión:
+3. Crear `.env` a partir de la plantilla:
    ```powershell
    Copy-Item .env.example .env
+   ```
+   En macOS: `cp .env.example .env`. Debes ver: nada (sin mensaje es que funcionó).
+4. Generar la clave de sesión (`SECRET_KEY`). Python corre **dentro** de un contenedor, no hay que instalarlo:
+   ```powershell
    docker run --rm python:3.14-slim python -c "import secrets; print(secrets.token_hex(32))"
    ```
-   Debes ver: 64 letras y números. En `.env`, ponerlos en `SECRET_KEY` ([ver 6.3](#63-sesión-en-3-backends)), escribir contraseñas con solo letras y números en `POSTGRES_PASSWORD` y `DD_POSTGRES_PASSWORD`, y llenar `DD_API_KEY` y `DD_SITE` solo si se va a usar Datadog ([sección 7](#7-datadog-agent-y-cuenta)).
-3. Construir y levantar todo: `docker compose up -d --build`
-4. Revisar el estado: `docker compose ps`
-   Debes ver: `db`, `backend1`, `backend2` y `backend3` en `(healthy)`.
-5. Abrir <http://localhost:8080> e iniciar sesión con `demo@taquilla.test` / `Taquilla2026!`.
+   Debes ver: 64 letras y números. Cópialos.
+5. Generar una contraseña. Corre el comando **dos veces**: una para `POSTGRES_PASSWORD` y otra para `DD_POSTGRES_PASSWORD`:
+   ```powershell
+   docker run --rm python:3.14-slim python -c "import secrets; print(secrets.token_hex(16))"
+   ```
+   Debes ver: 32 letras y números (cumple la regla "solo letras y números").
+6. Abrir `.env` para llenarlo:
+   ```powershell
+   notepad .env
+   ```
+   En macOS: `open -e .env`. Llena estas variables, sin espacios alrededor del `=`, y guarda:
+
+   | Variable | ¿Obligatoria? | Qué poner |
+   |---|:---:|---|
+   | `DD_API_KEY` | Sí | La API key del paso 4.2 |
+   | `DD_SITE` | Sí | El sitio del paso 4.2, por ejemplo `datadoghq.com` |
+   | `POSTGRES_PASSWORD` | Sí | La primera contraseña del paso 5 |
+   | `DD_POSTGRES_PASSWORD` | Sí | La segunda contraseña del paso 5 |
+   | `SECRET_KEY` | Sí | Las 64 letras y números del paso 4 ([por qué](#63-sesión-en-3-backends)) |
+   | `DD_APP_KEY` | No | Solo para `analizar_datadog.py` ([10.9](#109-analizar-una-corrida-con-las-métricas-de-datadog)) |
+   | `JJ_EMAIL` · `JJ_PASSWORD` | Sí, para Artillery | Ya vienen llenas con la cuenta de prueba `demo@taquilla.test` / `Taquilla2026!` ([6.1](#61-qué-hace)); déjalas así. Las necesitan `normal.yml`, `pico.yml` y `pico-datadog.yml`: sin ellas, todos los usuarios virtuales fallan con `JJ_CREDENCIALES_AUSENTES`. Si tu `.env` es anterior, agrégale estas dos líneas |
+   | `POSTGRES_DB` · `POSTGRES_USER` · `BACKEND1_WORKERS` a `BACKEND3_WORKERS` · `JJ_EVENT_ID` | No | Déjalas como vienen |
+
+7. Comprobar que no falta ninguna variable obligatoria (no muestra los valores):
+   ```powershell
+   docker compose config --quiet
+   ```
+   Debes ver: nada. Si falta una, sale `Define <VARIABLE> en el archivo .env (ver .env.example)`: llénala y repite el paso.
+
+> [!NOTE]
+> Las contraseñas de PostgreSQL solo se aplican la primera vez que se crea la base (volumen `pg-data`). Si las cambias después, hay que volver a los datos iniciales ([4.8](#48-apagar-todo)).
+
+### 4.4 Levantar y comprobar que funcionó
+
+1. Construir y levantar todo:
+   ```powershell
+   docker compose up -d --build
+   ```
+   Debes ver: la primera vez descarga imágenes y construye los backends (unos minutos); al final, líneas `Container ... Started` o `Healthy`.
+2. Revisar el estado:
+   ```powershell
+   docker compose ps
+   ```
+   Debes ver: `db`, `backend1`, `backend2`, `backend3` y `datadog-agent` en `(healthy)`, y `haproxy` en `Up` (la imagen de HAProxy no trae chequeo de salud; su estado se ve en el paso 5). El Agent puede mostrar `(health: starting)` durante el primer minuto: repite el comando.
+3. Abrir <http://localhost:8080> en el navegador e iniciar sesión con `demo@taquilla.test` / `Taquilla2026!`.
    Debes ver: la cartelera, tu nombre arriba y "Atendido por backendX" en el pie.
-6. Comprobar el balanceo con 6 llamadas seguidas:
+4. Ver qué backend atiende cada petición. Corre este comando **6 veces**:
    ```powershell
    curl.exe -s http://localhost:8080/api/info
-   curl.exe -s http://localhost:8080/api/info
-   curl.exe -s http://localhost:8080/api/info
-   curl.exe -s http://localhost:8080/api/info
-   curl.exe -s http://localhost:8080/api/info
-   curl.exe -s http://localhost:8080/api/info
    ```
-   Debes ver: `backend1`, `backend2`, `backend3`, y otra vez en el mismo orden.
+   En macOS: `curl -s http://localhost:8080/api/info`. Debes ver: van saliendo `backend1`, `backend2` y `backend3` por turnos.
+5. Abrir <http://localhost:8404/stats> (solo funciona desde este mismo equipo).
+   Debes ver: `backend1`, `backend2` y `backend3` en verde (`UP`).
+6. Comprobar que el Agent entra a tu cuenta de Datadog:
+   ```powershell
+   docker compose exec -T datadog-agent agent status | Select-String "API Key"
+   ```
+   En macOS: `docker compose exec -T datadog-agent agent status | grep "API Key"`. Debes ver: `API Key valid`.
+7. En Datadog, abrir **Logs** y buscar `service:haproxy`.
+   Debes ver: después de 1 o 2 minutos, las líneas JSON de HAProxy con `status_code`, `server` y `total_ms`.
 
-- Después de recrear los backends, ejecutar `docker compose restart haproxy` (problema conocido que se arregla en la fase de HAProxy).
-- Volver a los datos iniciales (borra las reservas y las cuentas nuevas): `docker compose rm -s -f db`, luego `docker volume rm pg-data` y `docker compose up -d`. Para apagar todo: `docker compose down`.
+| Dirección | Qué es |
+|---|---|
+| <http://localhost:8080> | La Taquilla (la aplicación) |
+| <http://localhost:8080/api/info> | Qué backend respondió |
+| <http://localhost:8404/stats> | Tablero de estadísticas de HAProxy (solo desde este equipo) |
+| <https://app.datadoghq.com> | Datadog (cambia según tu `DD_SITE`) |
+| [Enlace público del dashboard del grupo](https://p.datadoghq.com/sb/95a7b1a2-d9f8-11f1-b57e-baea63f7b3d6-ccacbd422eed735a402e91352d62c6ba) | Se ve sin cuenta, pero muestra los datos de la cuenta del grupo, no los tuyos |
+
+### 4.5 Importar el dashboard y los monitores a tu cuenta
+
+En la cuenta del grupo ya están creados; ahí se actualizan como dice [8.4](#84-cómo-importar-en-datadog). En una cuenta nueva:
+
+1. Crea primero el Team `haproxy-telematicos` con tu correo (pasos "Team para los avisos" de [8.4](#84-cómo-importar-en-datadog)). Los monitores avisan a `@team-haproxy-telematicos`.
+2. Dashboard: en Datadog, **Dashboards → New Dashboard**, ponle cualquier nombre, y en el engranaje **Configure → Import dashboard JSON** escoge el archivo `datadog/dashboards/haproxy_cluster_dashboard.json`.
+   Debes ver: "Cluster HAProxy - Monitoreo y Rendimiento" con 7 grupos y el filtro `backend` arriba.
+3. Copiar el primer monitor al portapapeles:
+   ```powershell
+   Get-Content datadog/monitors/backend_down_monitor.json -Raw | Set-Clipboard
+   ```
+   En macOS: `pbcopy < datadog/monitors/backend_down_monitor.json`.
+4. En Datadog, **Monitors → New Monitor → Import from JSON**, pegar y crear.
+   Debes ver: el monitor "[HAProxy] Caída de servidor backend detectada".
+5. Repetir los pasos 3 y 4 con `high_error_rate_monitor.json` y `reservation_unavailable_monitor.json`.
+   Debes ver: en **Monitors → Manage Monitors**, los 3 monitores (los explica la [guía de alertas](#82-guía-de-alertas)).
+
+### 4.6 Una prueba corta con Artillery (en contenedor)
+
+1. Lanzar 40 peticiones en 20 s. Artillery corre en su propio contenedor, no se instala. En Windows usa PowerShell (en Git Bash las rutas se convierten mal):
+   ```powershell
+   docker run --rm --network cluster-net -v "${PWD}/artillery:/scripts:ro" artilleryio/artillery:2.0.34 run /scripts/smoke-datadog.yml
+   ```
+   Debes ver: en el resumen final, `http.requests` y `http.codes.200` en 40, y `vusers.failed` en 0.
+2. En Datadog, **Event Management → All Events**, después de 1 o 2 minutos.
+   Debes ver: los eventos de inicio y fin de "Artillery smoke-datadog". En **Metrics → Explorer**, `artillery.http.requests` con `test:smoke-datadog` suma 40.
+
+Los escenarios largos (errores, caída, workers, concurrencia) están en la [sección 10](#10-pruebas-de-punta-a-punta-y-simulación-de-caída).
+
+### 4.7 Apagar y prender un backend
+
+1. Apagar `backend2`:
+   ```powershell
+   docker compose stop backend2
+   ```
+   Debes ver: `Container backend2 Stopped`.
+2. Recargar <http://localhost:8404/stats>.
+   Debes ver: `backend2` en rojo (`DOWN`) a los ~5 s. La Taquilla sigue funcionando y `curl.exe -s http://localhost:8080/api/info` solo responde `backend1` y `backend3`.
+3. Mirar Datadog.
+   Debes ver: en el dashboard, grupo "1. Estado", `backend2` en rojo; el monitor "[HAProxy] Caída de servidor backend detectada" pasa a `[Triggered]` unos **60 s** después de apagarlo (medido, [10.10](#1010-resultados-medidos)) y llega un correo al Team.
+4. Prender `backend2`:
+   ```powershell
+   docker compose start backend2
+   ```
+   Debes ver: `backend2` en verde en <http://localhost:8404/stats> a los ~4 s, y el monitor en `[Recovered]` unos 60 s después.
+
+### 4.8 Apagar todo
+
+1. Apagar y borrar los contenedores (los datos de la base se conservan en el volumen `pg-data`):
+   ```powershell
+   docker compose down
+   ```
+   Debes ver: líneas `Container ... Removed`. Para volver a prender: `docker compose up -d`.
+
+Otras situaciones:
+- **Volver a los datos iniciales** (borra las reservas y las cuentas nuevas): `docker compose rm -s -f db`, luego `docker volume rm pg-data` y `docker compose up -d`.
+- **Después de recrear los backends** (por ejemplo con `--build` o `workers.sh`), ejecutar `docker compose restart haproxy`: HAProxy guarda la dirección de cada backend al arrancar.
+
+### 4.9 Si algo falla
+
+| Lo que ves | Qué hacer |
+|---|---|
+| `docker` no se reconoce como comando | Cerrar y abrir la terminal ([sección 11](#11-solución-de-problemas)) |
+| Error de conexión con Docker | Abrir Docker Desktop y esperar a que diga que está corriendo |
+| `Define <VARIABLE> en el archivo .env` | Llenar esa variable ([4.3](#43-descargar-el-proyecto-y-crear-env), paso 6) |
+| `port is already allocated` (8080 o 8404) | Otro programa usa ese puerto: cerrarlo y repetir `docker compose up -d` |
+| `datadog-agent` en `Exited` o `Restarting`, o no sale `API Key valid` | `DD_API_KEY` o `DD_SITE` mal escritos ([sección 11](#11-solución-de-problemas)) |
+| Un backend en `(unhealthy)` o en `DOWN` | [Sección 11](#11-solución-de-problemas) |
+| Las métricas de Artillery no llegan a Datadog | [Sección 11](#11-solución-de-problemas) y [7.10](#710-dogstatsd-métricas-de-artillery) |
+| Un script `.sh` dice `\r: command not found` | [Sección 11](#11-solución-de-problemas) |
+
+Para cualquier otro mensaje, búscalo en la [sección 11 · Solución de problemas](#11-solución-de-problemas).
 
 ---
 
@@ -660,7 +843,7 @@ Por qué esos valores:
 
 | Falla | Se ve en el dashboard | Suena el monitor |
 |---|---|---|
-| Se cae un backend | 5 a 10 s (medido: HAProxy lo marca caído a los ~4 s y el Agent lee cada 5 s) | 10 a 15 s para tener 2 lecturas, más lo que tarde Datadog en evaluar y enviar el correo |
+| Se cae un backend | 5 a 10 s (medido: HAProxy lo marca caído a los ~4 s y el Agent lee cada 5 s) | **Medido: 60 s** desde la orden de detener `backend1` hasta `[Triggered]`, y 60 s desde la orden de iniciarlo hasta `[Recovered]` ([10.10](#1010-resultados-medidos)). Las 2 lecturas toman 10 a 15 s; el resto lo pone Datadog al evaluar el monitor (no se midió por separado) |
 | Se cae la base de datos | 15 a 30 s (el cliente misterioso pide cada 15 s y el backend tarda 5 s en dar el 503) | 30 a 45 s para tener 2 fallas, más la evaluación de Datadog |
 | Muchos errores 5xx | En el siguiente envío del Agent (~15 s) | De 1 a 6 min: promedio de 5 min más 60 s de espera (más rápido cuanto más alto el %) |
 
@@ -690,9 +873,11 @@ Monitores de ejemplo que se borraron a mano (no son del proyecto): los 7 de infr
 
 ### 8.5 Evidencias para el informe
 
-Dos capturas (no se suben al repo):
+Las capturas **sí se guardan en el repo**, una carpeta por prueba: `docs/evidencias/pruebas/NN-<prueba>/capturas/` (ya están `01-integracion-datadog`, `02-errores`, `03-falla` y `04-experimentos`). Las de la entrega final van en `docs/evidencias/pruebas/05-entrega/capturas/`. Ninguna captura puede mostrar claves ni correos personales completos.
+
+Capturas mínimas para el informe:
 1. **Dashboard con tráfico:** vista completa durante una prueba de Artillery, con peticiones por segundo y percentiles subiendo.
-2. **Alerta activa:** el monitor de caída en CRITICAL y el correo recibido tras `docker compose stop backend2`.
+2. **Alerta activa:** el monitor de caída en `[Triggered]` y el correo recibido al apagar un backend. En `docs/evidencias/pruebas/03-falla/capturas/` ya están el correo de caída (`correo-caida-backend.jpeg`) y el semáforo del dashboard con `backend2` en `CRIT` (`datadog-caida-backend2.jpeg`).
 
 ---
 
@@ -1155,7 +1340,7 @@ Al terminar, el script imprime el comando de [`analizar_datadog.py`](#109-analiz
 
 **Límites del experimento:** todo se ejecuta en un solo equipo. Los backends comparten CPU con Artillery, PostgreSQL y el Agent, y cada backend tiene un límite de 1 CPU y 384 MB de memoria. Se realiza una corrida por configuración, excepto para 2 workers, que se repite.
 
-**Resultados:** pendientes de completar con las corridas y su análisis de Datadog.
+**Resultados:** las corridas de 1, 2 y 4 workers ya se hicieron; los resultados y su análisis están en el [Registro de pruebas, apartado 5.3](docs/evidencias/pruebas/Registro-de-pruebas.md#53-experimentos-con-diferentes-cantidades-de-workers-de-gunicorn) y los reportes de Artillery en `docs/evidencias/pruebas/04-experimentos/resultados/` (`1worker.txt`, `2workers.txt`, `2workersRE.txt`, `4workers.txt`).
 
 ### 10.14 Revisión de secretos antes de entregar
 
