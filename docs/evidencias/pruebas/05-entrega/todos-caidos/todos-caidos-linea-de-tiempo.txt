@@ -1,0 +1,45 @@
+20:11:11.134Z | 15:11:11 local | Reparto previo: 30 GET /api/info
+     10 backend1
+     10 backend2
+     10 backend3
+20:11:13.686Z | 15:11:13 local | Tráfico bajo iniciado (2 req/s a /api/info)
+20:11:23.931Z | 15:11:23 local | ORDEN: docker compose stop backend1 backend2 backend3
+ Container backend2 Stopping 
+ Container backend1 Stopping 
+ Container backend3 Stopping 
+ Container backend3 Stopped 
+ Container backend2 Stopped 
+ Container backend1 Stopped 
+20:11:26.408Z | 15:11:26 local | Fin de la orden stop (contenedores detenidos)
+20:11:41.572Z | 15:11:41 local | Comprobación puntual con curl -w (3 peticiones)
+  HTTP 503 en 0.005086 s
+  HTTP 503 en 0.006014 s
+  HTTP 503 en 0.005282 s
+HTTP/1.1 503 Service Unavailable
+content-length: 107
+cache-control: no-cache
+content-type: text/html
+
+<html><body><h1>503 Service Unavailable</h1>
+No server is available to handle this request.
+</body></html>
+20:11:42.083Z | 15:11:42 local | ORDEN: docker compose start backend1 backend2 backend3
+ Container db Waiting 
+ Container db Waiting 
+ Container db Waiting 
+ Container db Healthy 
+ Container db Healthy 
+ Container backend2 Starting 
+ Container backend1 Starting 
+ Container db Healthy 
+ Container backend3 Starting 
+ Container backend2 Started 
+ Container backend1 Started 
+ Container backend3 Started 
+20:11:44.669Z | 15:11:44 local | Fin de la orden start
+20:11:52.632Z | 15:11:52 local | 3 backends healthy en Docker y UP en HAProxy
+20:12:04.101Z | 15:12:04 local | Tráfico detenido
+20:12:04.223Z | 15:12:04 local | Reparto posterior: 30 GET /api/info
+     10 backend1
+     10 backend2
+     10 backend3

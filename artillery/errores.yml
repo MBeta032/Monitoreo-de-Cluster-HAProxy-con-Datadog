@@ -1,0 +1,102 @@
+# Tráfico con errores controlados: 401, 403, 404 y 500.
+# No reserva ninguna silla: el 403 va sin token CSRF y el 404 usa una silla que no existe.
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - duration: 420
+      arrivalRate: 5
+      name: "Tráfico con errores controlados"
+  plugins:
+    # Métricas y eventos de inicio y fin hacia el Datadog Agent (DogStatsD).
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:errores"
+        event:
+          title: "Artillery errores"
+          text: "Escenario de errores controlados (401, 403, 404 y 500)"
+          priority: normal
+          tags:
+            - "test:errores"
+    # Una métrica por nombre de petición, no por URL.
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  # 70 % de tráfico correcto
+  - name: "cartelera"
+    weight: 40
+    flow:
+      - get:
+          url: "/api/events"
+          name: "cartelera"
+
+  - name: "detalle_evento"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/events/1"
+          name: "evento"
+
+  # 10 % al endpoint de error (500)
+  - name: "error_500"
+    weight: 10
+    flow:
+      - get:
+          url: "/error"
+          name: "error_500"
+
+  # 5 % de inicios de sesión incorrectos (401)
+  - name: "login_incorrecto_401"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/login"
+          name: "login_401"
+          json:
+            email: "demo@taquilla.test"
+            password: "clave-incorrecta"
+
+  # 5 % de reservas sin token CSRF (403)
+  - name: "reserva_sin_csrf_403"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/login"
+          name: "login_ok"
+          json:
+            email: "demo@taquilla.test"
+            password: "Taquilla2026!"
+      - post:
+          url: "/api/events/1/seats/12/reserve"
+          name: "reserva_403"
+
+  # 5 % de sillas inexistentes (404)
+  - name: "silla_inexistente_404"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/login"
+          name: "login_ok"
+          json:
+            email: "demo@taquilla.test"
+            password: "Taquilla2026!"
+          capture:
+            - json: "$.csrf_token"
+              as: "csrf"
+      - post:
+          url: "/api/events/1/seats/999999/reserve"
+          name: "silla_404"
+          headers:
+            X-CSRF-Token: "{{ csrf }}"
+
+  # 5 % de eventos inexistentes (404)
+  - name: "evento_inexistente_404"
+    weight: 5
+    flow:
+      - get:
+          url: "/api/events/999999"
+          name: "evento_404"

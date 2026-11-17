@@ -1,0 +1,30 @@
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - name: "Calentamiento y referencia"
+      duration: 120
+      arrivalRate: 5
+
+    - name: "Subida gradual"
+      duration: 60
+      arrivalRate: 5
+      rampTo: 25
+
+    - name: "Pico sostenido"
+      duration: 180
+      arrivalRate: 25
+
+    - name: "Bajada gradual"
+      duration: 60
+      arrivalRate: 25
+      rampTo: 5
+
+    - name: "Recuperación"
+      duration: 120
+      arrivalRate: 5
+
+scenarios:
+  - name: "Consultar la página principal"
+    flow:
+      - get:
+          url: "/"

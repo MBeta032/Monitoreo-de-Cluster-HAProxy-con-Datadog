@@ -1,0 +1,60 @@
+# Demo del video: tráfico con errores controlados (4 min) para disparar el monitor de 5xx.
+# No reserva sillas. Los errores 500 salen de la ruta /error de los backends.
+# EDICIÓN EN VIVO: subir el weight de "error_500" de 2 a 10 (de unos 2 % a unos 10 % de 5xx).
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - name: "tráfico con errores"
+      duration: 240
+      arrivalRate: 8
+  plugins:
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:demo-errores"
+        event:
+          title: "Artillery demo-errores"
+          text: "Video de la demo: errores controlados 401, 404 y 500"
+          priority: normal
+          tags:
+            - "test:demo-errores"
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  - name: "cartelera"
+    weight: 50
+    flow:
+      - get:
+          url: "/api/events"
+          name: "cartelera"
+  - name: "detalle_evento"
+    weight: 33
+    flow:
+      - get:
+          url: "/api/events/1"
+          name: "evento"
+  - name: "error_500"
+    weight: 2
+    flow:
+      - get:
+          url: "/error"
+          name: "error_500"
+  - name: "login_incorrecto_401"
+    weight: 5
+    flow:
+      - post:
+          url: "/api/login"
+          name: "login_401"
+          json:
+            email: "demo@taquilla.test"
+            password: "clave-incorrecta"
+  - name: "evento_inexistente_404"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/events/999999"
+          name: "evento_404"

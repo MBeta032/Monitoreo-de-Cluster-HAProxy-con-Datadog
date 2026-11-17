@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "steps.html" import steps_bar %}
+
+{% block title %}{{ event.name }}{% endblock %}
+
+{% block content %}
+<p class="back-link"><a href="{{ url_for('index') }}">← Volver a la cartelera</a></p>
+<h1 class="page-title">{{ event.name }}</h1>
+<p class="event-detail">{{ event.venue }} · {{ event.starts_at.strftime("%d/%m/%Y") }} · {{ event.starts_at.strftime("%H:%M") }} h</p>
+{{ steps_bar(1) }}
+
+{% if event.available_seats == 0 %}
+{% include "sold_out_notice.html" %}
+{% endif %}
+
+<div class="map-layout">
+  <!-- Plano de la arena: escenario arriba y las zonas donde estarían -->
+  <section class="card">
+    <div class="stage">ESCENARIO</div>
+
+    <div class="venue-map">
+      {% for section in sections %}
+      {% if section.available_seats == 0 %}
+      <div class="zone {{ section.section | zone_class }} zone-sold-out">
+        <strong>{{ section.section }}</strong>
+        <span class="badge badge-sold-out">AGOTADO</span>
+      </div>
+      {% else %}
+      <a class="zone {{ section.section | zone_class }}" href="{{ url_for('event_page', event_id=event.id, section=section.section) }}">
+        <strong>{{ section.section }}</strong>
+        <span>Quedan {{ section.available_seats }} de {{ section.total_seats }}</span>
+      </a>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <p class="legend">
+      <span class="legend-item"><span class="legend-color zone-platea"></span> Platea</span>
+      <span class="legend-item"><span class="legend-color zone-central"></span> Gradería Central</span>
+      <span class="legend-item"><span class="legend-color zone-left"></span> Graderías laterales</span>
+      <span class="legend-item"><span class="legend-color zone-sold-out"></span> Agotado</span>
+    </p>
+  </section>
+
+  <!-- Disponibilidad total y por zona -->
+  <aside class="card">
+    <h2 class="card-title">DISPONIBILIDAD</h2>
+    <p class="availability-total"><strong>{{ event.available_seats }}</strong> de {{ event.total_seats }} sillas libres</p>
+    {% if event.total_seats > 0 %}
+    {% set free_percent = (event.available_seats * 100 / event.total_seats) | round | int %}
+    {% else %}
+    {% set free_percent = 0 %}
+    {% endif %}
+    <div class="progress" role="img" aria-label="{{ free_percent }} % de sillas libres">
+      <div class="progress-bar" style="width: {{ free_percent }}%"></div>
+    </div>
+
+    <ul class="zone-summary">
+      {% for section in sections %}
+      <li>
+        <span><span class="legend-color {{ section.section | zone_class }}"></span> {{ section.section }}</span>
+        <span>{{ section.available_seats }} / {{ section.total_seats }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <div class="note">
+      <strong>¿Cuándo se aparta mi silla?</strong>
+      <p>Solo cuando confirmas la reserva. Mientras eliges, otra persona puede tomarla.</p>
+    </div>
+  </aside>
+</div>
+{% endblock %}

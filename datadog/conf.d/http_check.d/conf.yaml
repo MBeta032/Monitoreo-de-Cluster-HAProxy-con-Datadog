@@ -1,0 +1,18 @@
+# Cliente misterioso: el Agent pide la cartelera como lo haría un usuario, aunque no haya tráfico.
+# La petición pasa por HAProxy, un backend y PostgreSQL. Si la base se cae, HAProxy sigue viendo
+# los backends sanos (/health no usa la base), pero esta petición falla y el check queda CRITICAL.
+# Opciones según el conf.yaml.example oficial de la integración http_check.
+init_config: {}
+
+instances:
+  - name: taquilla-api-events
+    url: http://haproxy:8080/api/events
+    # Segundos máximos de espera por la respuesta. Con 10 alcanza a llegar el 503 del backend
+    # (que espera 5 s al pool de conexiones) y el mensaje en Datadog dice "503" y no "timed out".
+    timeout: 10
+    # Solo un 200 cuenta como éxito (por defecto acepta cualquier 1xx, 2xx o 3xx)
+    http_response_status_code: 200
+    tags:
+      - project:haproxy-telematicos
+      - env:lab
+    # Se repite cada 15 s (valor por defecto de min_collection_interval)

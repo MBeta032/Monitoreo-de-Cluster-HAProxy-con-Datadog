@@ -1,0 +1,51 @@
+# Rampa de carga para comparar 1, 2 y 4 workers de Gunicorn por backend (workers.sh).
+# Sube de 2 a 12 usuarios virtuales por segundo en 6 minutos. Cada usuario inicia sesión una sola
+# vez (el hash de la contraseña cuesta unos 300 ms de CPU) y hace 4 consultas de solo lectura:
+# no modifica datos, así que no hace falta reiniciar las sillas entre corridas.
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - duration: 360
+      arrivalRate: 2
+      rampTo: 12
+      name: "rampa de 2 a 12 usuarios por segundo"
+  plugins:
+    # Métricas y eventos de inicio y fin hacia el Datadog Agent (DogStatsD).
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:workers"
+        event:
+          title: "Artillery workers"
+          text: "Rampa de carga para comparar el número de workers de Gunicorn"
+          priority: normal
+          tags:
+            - "test:workers"
+    # Una métrica por nombre de petición, no por URL.
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  - name: "consulta_autenticada"
+    flow:
+      - post:
+          url: "/api/login"
+          name: "login"
+          json:
+            email: "demo@taquilla.test"
+            password: "Taquilla2026!"
+      - get:
+          url: "/api/events"
+          name: "cartelera"
+      - get:
+          url: "/api/events/1"
+          name: "evento"
+      - get:
+          url: "/api/events/1/seats?section=Platea"
+          name: "sillas_zona"
+      - get:
+          url: "/api/reservations"
+          name: "mis_reservas"

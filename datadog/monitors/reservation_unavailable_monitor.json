@@ -1,0 +1,22 @@
+{
+  "name": "[Taquilla] No se puede reservar (cliente misterioso)",
+  "type": "service check",
+  "query": "\"http.can_connect\".over(\"instance:taquilla_api_events\").by(\"instance\").last(2).count_by_status()",
+  "message": "{{#is_alert}}\n[CRÍTICO] El cliente misterioso no pudo ver la cartelera en 2 intentos seguidos (unos 30 s): los usuarios no pueden reservar.\nPieza afectada: la cadena HAProxy → backend → PostgreSQL (`GET http://haproxy:8080/api/events`). HAProxy puede seguir en verde porque /health no usa la base.\nPrimer paso: `docker compose ps db` y `docker compose logs db --tail 50`; luego el grupo \"Base de datos\" del dashboard.\n{{/is_alert}}\n{{#is_recovery}}\n[RECUPERADO] El cliente misterioso volvió a ver la cartelera: ya se puede reservar.\n{{/is_recovery}}\nDashboard: https://app.datadoghq.com/dashboard/nne-fkp-w5z\n@team-haproxy-telematicos",
+  "tags": [
+    "env:lab",
+    "project:haproxy-telematicos",
+    "service:taquilla"
+  ],
+  "options": {
+    "thresholds": {
+      "critical": 2,
+      "warning": 2,
+      "ok": 1
+    },
+    "notify_no_data": false,
+    "renotify_interval": 0,
+    "include_tags": true
+  },
+  "priority": 1
+}

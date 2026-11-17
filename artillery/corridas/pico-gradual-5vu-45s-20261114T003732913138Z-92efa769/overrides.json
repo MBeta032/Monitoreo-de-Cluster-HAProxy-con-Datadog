@@ -1,0 +1,34 @@
+{
+  "config": {
+    "target": "http://haproxy:8080",
+    "phases": [
+      {
+        "name": "Calentamiento",
+        "duration": 10,
+        "arrivalRate": 1
+      },
+      {
+        "name": "Subida gradual",
+        "duration": 5,
+        "arrivalRate": 1,
+        "rampTo": 5
+      },
+      {
+        "name": "Meseta",
+        "duration": 15,
+        "arrivalRate": 5
+      },
+      {
+        "name": "Bajada gradual",
+        "duration": 5,
+        "arrivalRate": 5,
+        "rampTo": 1
+      },
+      {
+        "name": "Recuperacion",
+        "duration": 10,
+        "arrivalRate": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "config": {
+    "target": "http://haproxy:8080",
+    "phases": [
+      {
+        "name": "Escalon inicial",
+        "duration": 66,
+        "arrivalRate": 4
+      },
+      {
+        "name": "Escalon intermedio",
+        "duration": 66,
+        "arrivalRate": 12
+      },
+      {
+        "name": "Escalon maximo",
+        "duration": 100,
+        "arrivalRate": 20
+      },
+      {
+        "name": "Recuperacion",
+        "duration": 68,
+        "arrivalRate": 4
+      }
+    ]
+  }
+}

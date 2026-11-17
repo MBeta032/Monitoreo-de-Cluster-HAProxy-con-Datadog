@@ -1,0 +1,69 @@
+{
+  "config": {
+    "target": "http://haproxy:8080",
+    "phases": [
+      {
+        "duration": 1,
+        "arrivalCount": 1,
+        "name": "Un usuario funcional"
+      }
+    ],
+    "processor": "./taquilla.js",
+    "http": {
+      "timeout": 30
+    },
+    "plugins": {
+      "metrics-by-endpoint": {}
+    }
+  },
+  "scenarios": [
+    {
+      "name": "Taquilla autenticada",
+      "beforeScenario": "iniciar",
+      "flow": [
+        {
+          "post": {
+            "url": "/api/login",
+            "json": {
+              "email": "{{ email }}",
+              "password": "{{ password }}"
+            },
+            "afterResponse": "login",
+            "name": "login"
+          }
+        },
+        {
+          "get": {
+            "url": "/api/events",
+            "afterResponse": "eventos",
+            "name": "eventos"
+          }
+        },
+        {
+          "get": {
+            "url": "/api/events/{{ event_id }}/seats",
+            "afterResponse": "sillas",
+            "name": "sillas"
+          }
+        },
+        {
+          "post": {
+            "url": "/api/events/{{ event_id }}/seats/{{ seat_id }}/reserve",
+            "headers": {
+              "X-CSRF-Token": "{{ csrf_token }}"
+            },
+            "afterResponse": "reserva",
+            "name": "reservar_silla"
+          }
+        },
+        {
+          "get": {
+            "url": "/api/reservations",
+            "afterResponse": "misReservas",
+            "name": "mis_reservas"
+          }
+        }
+      ]
+    }
+  ]
+}

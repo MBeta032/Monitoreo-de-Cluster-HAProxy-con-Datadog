@@ -1,0 +1,55 @@
+hora_utc,codigo,tiempo_total_s,cuerpo
+20:11:13.855,200,0.010600,{"instance":"backend2"}
+20:11:14.638,200,0.009382,{"instance":"backend1"}
+20:11:15.539,200,0.011042,{"instance":"backend2"}
+20:11:16.319,200,0.008847,{"instance":"backend3"}
+20:11:17.155,200,0.015493,{"instance":"backend1"}
+20:11:17.954,200,0.010210,{"instance":"backend2"}
+20:11:18.846,200,0.014571,{"instance":"backend3"}
+20:11:19.648,200,0.009328,{"instance":"backend1"}
+20:11:20.420,200,0.008271,{"instance":"backend2"}
+20:11:21.218,200,0.009792,{"instance":"backend3"}
+20:11:22.010,200,0.008284,{"instance":"backend1"}
+20:11:22.795,200,0.008917,{"instance":"backend2"}
+20:11:23.567,200,0.009021,{"instance":"backend3"}
+20:11:24.374,200,0.009500,{"instance":"backend1"}
+20:11:25.335,502,0.008748,<html><body><h1>502 Bad Gateway</h1>The server returned an i
+20:11:30.213,503,4.015936,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:31.010,503,0.006599,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:31.772,503,0.005778,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:32.538,503,0.005694,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:33.406,503,0.006084,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:34.264,503,0.008058,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:35.075,503,0.011361,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:35.884,503,0.007953,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:36.662,503,0.006468,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:38.037,503,0.018465,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:38.852,503,0.006152,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:39.766,503,0.015123,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:40.582,503,0.006653,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:41.380,503,0.007367,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:42.218,503,0.009295,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:42.998,503,0.006087,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:43.848,503,0.011850,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:44.765,503,0.013323,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:45.780,503,0.009120,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:46.795,503,0.009166,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:47.585,503,0.006947,<html><body><h1>503 Service Unavailable</h1>No server is ava
+20:11:48.574,200,0.031248,{"instance":"backend2"}
+20:11:49.658,200,0.028047,{"instance":"backend1"}
+20:11:50.481,200,0.009522,{"instance":"backend2"}
+20:11:51.263,200,0.010895,{"instance":"backend3"}
+20:11:52.069,200,0.012909,{"instance":"backend1"}
+20:11:52.860,200,0.010234,{"instance":"backend2"}
+20:11:53.636,200,0.008114,{"instance":"backend3"}
+20:11:54.456,200,0.010079,{"instance":"backend1"}
+20:11:55.289,200,0.008767,{"instance":"backend2"}
+20:11:56.116,200,0.012074,{"instance":"backend3"}
+20:11:56.960,200,0.009750,{"instance":"backend1"}
+20:11:57.776,200,0.008805,{"instance":"backend2"}
+20:11:58.605,200,0.011006,{"instance":"backend3"}
+20:11:59.415,200,0.009871,{"instance":"backend2"}
+20:12:00.277,200,0.013094,{"instance":"backend3"}
+20:12:01.081,200,0.011351,{"instance":"backend1"}
+20:12:01.871,200,0.009700,{"instance":"backend2"}
+20:12:02.653,200,0.008071,{"instance":"backend3"}

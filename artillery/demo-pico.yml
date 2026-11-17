@@ -1,0 +1,48 @@
+# Demo del video: tráfico normal, pico y regreso a la normalidad (5 min 30 s).
+# Solo consulta la cartelera (GET /api/events): no inicia sesión ni reserva sillas,
+# así que no necesita JJ_EMAIL ni reiniciar sillas.
+# EDICIÓN EN VIVO: cambiar el arrivalRate del pico de 15 a 25 y el rampTo de la subida.
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - name: "antes (tráfico normal)"
+      duration: 60
+      arrivalRate: 5
+    - name: "subida"
+      duration: 30
+      arrivalRate: 5
+      rampTo: 15
+    - name: "pico"
+      duration: 150
+      arrivalRate: 15
+    - name: "bajada"
+      duration: 30
+      arrivalRate: 15
+      rampTo: 5
+    - name: "después (tráfico normal)"
+      duration: 60
+      arrivalRate: 5
+  plugins:
+    # Métricas y eventos de inicio y fin hacia el Datadog Agent (DogStatsD).
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:demo-pico"
+        event:
+          title: "Artillery demo-pico"
+          text: "Video de la demo: tráfico normal, pico y regreso"
+          priority: normal
+          tags:
+            - "test:demo-pico"
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  - name: "cartelera"
+    flow:
+      - get:
+          url: "/api/events"
+          name: "cartelera"

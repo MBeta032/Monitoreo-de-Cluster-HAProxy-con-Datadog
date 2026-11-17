@@ -1,0 +1,17 @@
+{# Barra de pasos de la reserva: 1 Ubicación · 2 Confirmar · 3 Listo.
+   Uso: {% from "steps.html" import steps_bar %} ... {{ steps_bar(2) }}
+   El paso actual va resaltado; los anteriores se marcan como hechos con ✓. #}
+{% macro steps_bar(current_step) %}
+<nav class="steps" aria-label="Pasos de la reserva">
+  <ol>
+    {% for step_name in ["Ubicación", "Confirmar", "Listo"] %}
+    {% set step_number = loop.index %}
+    <li class="step {% if step_number == current_step %}current{% elif step_number < current_step %}done{% endif %}"
+        {% if step_number == current_step %}aria-current="step"{% endif %}>
+      <span class="step-number">{% if step_number < current_step %}✓{% else %}{{ step_number }}{% endif %}</span>
+      {{ step_name }}
+    </li>
+    {% endfor %}
+  </ol>
+</nav>
+{% endmacro %}

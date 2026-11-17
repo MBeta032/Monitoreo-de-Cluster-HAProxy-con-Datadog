@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Mis reservas{% endblock %}
+
+{% block content %}
+<p class="back-link"><a href="{{ url_for('index') }}">← Volver a la cartelera</a></p>
+<h1 class="page-title">Mis reservas</h1>
+
+{% if reservations %}
+<ul class="reservation-list">
+  {% for reservation in reservations %}
+  <li class="card reservation-item">
+    <span class="date-box date-box-dark">
+      <span class="date-day">{{ reservation.starts_at.day }}</span>
+      <span class="date-month">{{ reservation.starts_at | month_short }}</span>
+    </span>
+    <div class="reservation-info">
+      <h2 class="event-name">{{ reservation.event_name }}</h2>
+      <p class="event-detail">{{ reservation.venue }} · {{ reservation.starts_at.strftime("%H:%M") }} h</p>
+      <p>{{ reservation.section }} · Fila {{ reservation.seat_row }} · Silla {{ reservation.seat_number }}</p>
+    </div>
+    <div class="reservation-code">
+      <a href="{{ url_for('reservation_page', reservation_id=reservation.id) }}">{{ reservation.id | reservation_code }}</a>
+      <span class="badge badge-confirmed">Confirmada</span>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<section class="card empty-state">
+  <h2>Aún no tienes reservas</h2>
+  <p>Elige un evento de la cartelera y reserva tu silla.</p>
+  <a class="button-primary" href="{{ url_for('index') }}">Ir a la cartelera</a>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,98 +1,671 @@
 {
   "title": "Cluster HAProxy - Monitoreo y Rendimiento",
-  "description": "Dashboard de observabilidad para el cluster HAProxy con 3 backends HTTP. Muestra throughput, latencia promedio, disponibilidad de nodos y tasa de error HTTP.",
-  "layout_type": "free",
+  "description": "Taquilla Sucursal: estado, tráfico, tiempos, errores, saturación, reparto de HAProxy y base de datos de los 3 backends. Se importa sobre el dashboard nne-fkp-w5z (Configure -> Import dashboard JSON) para conservar su enlace público. Ver README, sección 8.",
+  "layout_type": "ordered",
+  "reflow_type": "auto",
+  "template_variables": [
+    {
+      "name": "backend",
+      "prefix": "backend",
+      "available_values": ["backend1", "backend2", "backend3"],
+      "defaults": ["*"]
+    }
+  ],
   "widgets": [
     {
-      "layout": {
-        "x": 0,
-        "y": 0,
-        "width": 55,
-        "height": 30
-      },
       "definition": {
-        "title": "Peticiones por segundo (Throughput)",
-        "type": "timeseries",
-        "requests": [
+        "type": "group",
+        "title": "1. Estado",
+        "layout_type": "ordered",
+        "show_title": true,
+        "widgets": [
           {
-            "q": "sum:haproxy.frontend.requests.rate{*}",
-            "display_type": "line"
+            "definition": {
+              "type": "note",
+              "content": "**Estado.** Verde = todo bien. El semáforo muestra cada ventanilla (backend) que HAProxy revisa cada segundo; `backend` es el grupo completo. El cliente misterioso pide la cartelera cada 15 s como un usuario: si se pone rojo, no se puede reservar (por ejemplo, la base de datos se cayó). La tasa de error es el % de respuestas 5xx: verde < 2 %, amarillo 2-5 %, rojo > 5 %.",
+              "background_color": "white",
+              "font_size": "14",
+              "text_align": "left",
+              "vertical_align": "top",
+              "show_tick": false,
+              "has_padding": true
+            }
+          },
+          {
+            "definition": {
+              "type": "check_status",
+              "title": "backend1",
+              "check": "haproxy.backend_up",
+              "grouping": "check",
+              "group": "backend:backend1,haproxy_service:be_app"
+            }
+          },
+          {
+            "definition": {
+              "type": "check_status",
+              "title": "backend2",
+              "check": "haproxy.backend_up",
+              "grouping": "check",
+              "group": "backend:backend2,haproxy_service:be_app"
+            }
+          },
+          {
+            "definition": {
+              "type": "check_status",
+              "title": "backend3",
+              "check": "haproxy.backend_up",
+              "grouping": "check",
+              "group": "backend:backend3,haproxy_service:be_app"
+            }
+          },
+          {
+            "definition": {
+              "type": "check_status",
+              "title": "Grupo be_app",
+              "check": "haproxy.backend_up",
+              "grouping": "check",
+              "group": "backend:backend,haproxy_service:be_app"
+            }
+          },
+          {
+            "definition": {
+              "type": "check_status",
+              "title": "Cliente misterioso: ¿se puede reservar?",
+              "check": "http.can_connect",
+              "grouping": "check",
+              "group": "env:lab,instance:taquilla_api_events,project:haproxy-telematicos,url:http://haproxy:8080/api/events"
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Tasa de error 5xx (%)",
+              "precision": 2,
+              "custom_unit": "%",
+              "requests": [
+                {
+                  "response_format": "scalar",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:haproxy.backend.response.5xx{haproxy_service:be_app,!backend:backend,$backend}",
+                      "aggregator": "avg"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "b",
+                      "query": "sum:haproxy.backend.requests.tot_rate{haproxy_service:be_app,!backend:backend,$backend}",
+                      "aggregator": "avg"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a / b * 100" }],
+                  "conditional_formats": [
+                    { "comparator": ">=", "value": 5, "palette": "white_on_red" },
+                    { "comparator": ">=", "value": 2, "palette": "white_on_yellow" },
+                    { "comparator": "<", "value": 2, "palette": "white_on_green" }
+                  ]
+                }
+              ]
+            }
           }
         ]
       }
     },
     {
-      "layout": {
-        "x": 58,
-        "y": 0,
-        "width": 55,
-        "height": 30
-      },
       "definition": {
-        "title": "Latencia promedio de respuesta (ms)",
-        "type": "timeseries",
-        "requests": [
+        "type": "group",
+        "title": "2. Tráfico",
+        "layout_type": "ordered",
+        "show_title": true,
+        "widgets": [
           {
-            "q": "avg:haproxy.backend.response.time{*}",
-            "display_type": "line"
+            "definition": {
+              "type": "note",
+              "content": "**Tráfico.** Peticiones por segundo que llegan a la Taquilla. El total es lo que recibe HAProxy en el puerto 8080 (sin contar la página de estadísticas). Por backend es lo que atendió cada aplicación, sin contar `/health` ni `/metrics`.",
+              "background_color": "white",
+              "font_size": "14",
+              "text_align": "left",
+              "vertical_align": "top",
+              "show_tick": false,
+              "has_padding": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Peticiones por segundo (total en HAProxy)",
+              "show_legend": false,
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:haproxy.frontend.requests.tot_rate{haproxy_service:fe_web}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a", "alias": "Peticiones por segundo" }]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Peticiones por segundo por backend (aplicación)",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:backend.http_requests.count{$backend} by {backend}.as_rate()"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a" }]
+                }
+              ]
+            }
           }
         ]
       }
     },
     {
-      "layout": {
-        "x": 0,
-        "y": 32,
-        "width": 55,
-        "height": 30
-      },
       "definition": {
-        "title": "Disponibilidad y salud de backends",
-        "type": "check_status",
-        "check": "haproxy.backend_up",
-        "grouping": "check",
-        "group_by": [
-          "backend"
-        ],
-        "tags": [
-          "*"
+        "type": "group",
+        "title": "3. Tiempo de espera",
+        "layout_type": "ordered",
+        "show_title": true,
+        "widgets": [
+          {
+            "definition": {
+              "type": "note",
+              "content": "**Tiempo de espera.** Cuánto tarda la respuesta. Los percentiles salen de los logs de HAProxy (`@total_ms`): p95 = 95 de cada 100 personas esperaron menos que ese valor. El tiempo por trámite (handler) permite comparar, por ejemplo, iniciar sesión (`/api/login`, más lento por el hash de la contraseña) contra reservar.",
+              "background_color": "white",
+              "font_size": "14",
+              "text_align": "left",
+              "vertical_align": "top",
+              "show_tick": false,
+              "has_padding": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Tiempo de respuesta de los backends (ms): promedio y máximo",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "avg:haproxy.backend.response.time{haproxy_service:be_app,!backend:backend,$backend}"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "b",
+                      "query": "max:haproxy.backend.response.time{haproxy_service:be_app,!backend:backend,$backend}"
+                    }
+                  ],
+                  "formulas": [
+                    { "formula": "a", "alias": "Promedio" },
+                    { "formula": "b", "alias": "Máximo" }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Percentiles del tiempo total (ms, logs de HAProxy; usa el filtro backend)",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "logs",
+                      "name": "a",
+                      "search": { "query": "service:haproxy @server:$backend.value" },
+                      "indexes": ["*"],
+                      "compute": { "aggregation": "median", "metric": "@total_ms" }
+                    },
+                    {
+                      "data_source": "logs",
+                      "name": "b",
+                      "search": { "query": "service:haproxy @server:$backend.value" },
+                      "indexes": ["*"],
+                      "compute": { "aggregation": "pc95", "metric": "@total_ms" }
+                    },
+                    {
+                      "data_source": "logs",
+                      "name": "c",
+                      "search": { "query": "service:haproxy @server:$backend.value" },
+                      "indexes": ["*"],
+                      "compute": { "aggregation": "pc99", "metric": "@total_ms" }
+                    }
+                  ],
+                  "formulas": [
+                    { "formula": "a", "alias": "p50 (mediana)" },
+                    { "formula": "b", "alias": "p95" },
+                    { "formula": "c", "alias": "p99" }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Tiempo promedio por trámite (ms)",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:backend.http_request_duration_seconds.sum{$backend} by {handler}.as_count()"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "b",
+                      "query": "sum:backend.http_request_duration_seconds.count{$backend} by {handler}.as_count()"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a / b * 1000" }]
+                }
+              ]
+            }
+          }
         ]
       }
     },
     {
-      "layout": {
-        "x": 58,
-        "y": 32,
-        "width": 55,
-        "height": 30
-      },
       "definition": {
-        "title": "Tasa de error HTTP (%)",
-        "type": "query_value",
-        "requests": [
+        "type": "group",
+        "title": "4. Errores en el tiempo",
+        "layout_type": "ordered",
+        "show_title": true,
+        "widgets": [
           {
-            "q": "sum:haproxy.backend.response.5xx{*}.as_rate() / sum:haproxy.frontend.requests.rate{*} * 100",
-            "conditional_formats": [
-              {
-                "comparator": "<",
-                "value": 2,
-                "palette": "white_on_green"
-              },
-              {
-                "comparator": ">=",
-                "value": 2,
-                "palette": "white_on_yellow"
-              },
-              {
-                "comparator": ">=",
-                "value": 5,
-                "palette": "white_on_red"
-              }
-            ]
+            "definition": {
+              "type": "note",
+              "content": "**Errores.** 5xx = falla del servidor (la línea roja en 5 % es el umbral de la alerta). 4xx = el pedido no se pudo atender: el 409 (silla ya reservada) se muestra aparte porque en una venta flash es normal y no es un error del sistema.",
+              "background_color": "white",
+              "font_size": "14",
+              "text_align": "left",
+              "vertical_align": "top",
+              "show_tick": false,
+              "has_padding": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Errores 5xx (%)",
+              "show_legend": false,
+              "markers": [
+                { "value": "y = 5", "display_type": "error dashed", "label": "Alerta 5 %" },
+                { "value": "y = 2", "display_type": "warning dashed", "label": "Aviso 2 %" }
+              ],
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:haproxy.backend.response.5xx{haproxy_service:be_app,!backend:backend,$backend}"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "b",
+                      "query": "sum:haproxy.backend.requests.tot_rate{haproxy_service:be_app,!backend:backend,$backend}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a / b * 100", "alias": "Errores 5xx (%)" }]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Errores 4xx por segundo: 409 (silla ya reservada) y otros",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "bars",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:backend.http_requests.count{$backend,status:409}.as_rate()"
+                    },
+                    {
+                      "data_source": "metrics",
+                      "name": "b",
+                      "query": "sum:backend.http_requests.count{$backend,status:4*,!status:409}.as_rate()"
+                    }
+                  ],
+                  "formulas": [
+                    { "formula": "a", "alias": "409 silla ya reservada" },
+                    { "formula": "b", "alias": "Otros 4xx" }
+                  ]
+                }
+              ]
+            }
           }
-        ],
-        "custom_unit": "%",
-        "precision": 2
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "5. Saturación de los backends",
+        "layout_type": "ordered",
+        "show_title": true,
+        "widgets": [
+          {
+            "definition": {
+              "type": "note",
+              "content": "**Saturación.** Cuánto usa cada contenedor de backend de lo que tiene permitido: 1 CPU y 384 MB de memoria (línea roja). Si la CPU toca la línea, el backend ya no puede atender más rápido.",
+              "background_color": "white",
+              "font_size": "14",
+              "text_align": "left",
+              "vertical_align": "top",
+              "show_tick": false,
+              "has_padding": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "CPU por backend (núcleos)",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "markers": [
+                { "value": "y = 1", "display_type": "error dashed", "label": "Límite 1 CPU" }
+              ],
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "avg:container.cpu.usage{short_image:haproxy-telematicos-backend,container_name:$backend.value} by {container_name}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a / 1000000000" }]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Memoria por backend (MB)",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "markers": [
+                { "value": "y = 384", "display_type": "error dashed", "label": "Límite 384 MB" }
+              ],
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "avg:container.memory.usage{short_image:haproxy-telematicos-backend,container_name:$backend.value} by {container_name}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a / 1048576" }]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "6. Reparto de HAProxy por servidor",
+        "layout_type": "ordered",
+        "show_title": true,
+        "widgets": [
+          {
+            "definition": {
+              "type": "note",
+              "content": "**Reparto.** Cómo reparte HAProxy entre los 3 servidores: peticiones, conexiones abiertas y cola (pedidos esperando un servidor libre). Sirve para comparar algoritmos de balanceo. Solo usa las filas de cada servidor (`!backend:backend`), así que no cuenta doble.",
+              "background_color": "white",
+              "font_size": "14",
+              "text_align": "left",
+              "vertical_align": "top",
+              "show_tick": false,
+              "has_padding": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Peticiones por segundo por servidor (HAProxy)",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:haproxy.backend.requests.tot_rate{haproxy_service:be_app,!backend:backend,$backend} by {backend}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a" }]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Conexiones activas por servidor",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:haproxy.backend.session.current{haproxy_service:be_app,!backend:backend,$backend} by {backend}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a" }]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Cola por servidor (pedidos esperando)",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:haproxy.backend.queue.current{haproxy_service:be_app,!backend:backend,$backend} by {backend}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a" }]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "7. Base de datos",
+        "layout_type": "ordered",
+        "show_title": true,
+        "widgets": [
+          {
+            "definition": {
+              "type": "note",
+              "content": "**Base de datos (PostgreSQL).** % de conexiones usadas (máximo 100), transacciones confirmadas por segundo, bloqueos por tabla (en una venta flash se ven en `seats`) y sillas reservadas (filas actualizadas de `seats`). La lista muestra las consultas que tardaron más de 250 ms.",
+              "background_color": "white",
+              "font_size": "14",
+              "text_align": "left",
+              "vertical_align": "top",
+              "show_tick": false,
+              "has_padding": true
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Conexiones usadas (%)",
+              "show_legend": false,
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "max:postgresql.percent_usage_connections{project:haproxy-telematicos}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a * 100", "alias": "Conexiones usadas (%)" }]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Commits por segundo",
+              "show_legend": false,
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "line",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:postgresql.commits{db:boleteria}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a", "alias": "Commits por segundo" }]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Bloqueos por tabla",
+              "show_legend": true,
+              "legend_layout": "horizontal",
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "bars",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:postgresql.locks{db:boleteria,table:*} by {table}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a" }]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Sillas reservadas por segundo (filas actualizadas de seats)",
+              "show_legend": false,
+              "requests": [
+                {
+                  "response_format": "timeseries",
+                  "display_type": "bars",
+                  "queries": [
+                    {
+                      "data_source": "metrics",
+                      "name": "a",
+                      "query": "sum:postgresql.rows_updated{db:boleteria,table:seats}"
+                    }
+                  ],
+                  "formulas": [{ "formula": "a", "alias": "Sillas reservadas por segundo" }]
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "list_stream",
+              "title": "Consultas lentas (más de 250 ms)",
+              "requests": [
+                {
+                  "response_format": "event_list",
+                  "query": {
+                    "data_source": "logs_stream",
+                    "query_string": "service:db duration",
+                    "indexes": []
+                  },
+                  "columns": [
+                    { "field": "status_line", "width": "auto" },
+                    { "field": "timestamp", "width": "auto" },
+                    { "field": "content", "width": "compact" }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
       }
     }
   ]

@@ -1,0 +1,39 @@
+{
+  "id": "normal-constante-20vu-600s-20261114T063656427326Z-29b5c9ff",
+  "inicio_utc": "2026-11-14T06:36:56.466322+00:00",
+  "escenario": "normal",
+  "patron": "constante",
+  "tasa_vu_s": 20,
+  "base_vu_s": 4,
+  "duracion_fases_s": 600,
+  "imagen_configurada": "artilleryio/artillery:2.0.34",
+  "sha256_archivos": {
+    "artillery/normal.yml": "1f5f67454076baaf0d152fb4478645fb246843c0cb1be3d87e39c5a780b324d3",
+    "docker-compose.yml": "db6f9b0c25cc7ce3771bf342d62f307e62c7b2c55a1087aff0fb235c30c4ed09",
+    "haproxy/haproxy.cfg": "cead4197d6754c29cd4857a6c3a23c98ab2a57a1914a02200ccb08fbf6f230bb",
+    "backends/gunicorn.conf.py": "af3217a190935a653165f7dfbcce80eff65482c5e395c1283137045bb6965bf6"
+  },
+  "resultado": "normal-constante-20vu-600s-20261114T063656427326Z-29b5c9ff.json",
+  "comando": [
+    "docker",
+    "compose",
+    "-f",
+    "C:\\Users\\ADMIN\\Desktop\\Universidad\\Septimo Semestre\\Telematicos\\Proyecto\\docker-compose.yml",
+    "--profile",
+    "tools",
+    "run",
+    "--rm",
+    "--no-deps",
+    "-T",
+    "--name",
+    "jj-carga-1088655e91a24e88935c64dccffb15ad",
+    "artillery",
+    "run",
+    "/scripts/corridas/normal-constante-20vu-600s-20261114T063656427326Z-29b5c9ff/escenario.yml",
+    "--overrides",
+    "{\"config\":{\"target\":\"http://haproxy:8080\",\"phases\":[{\"name\":\"Carga constante\",\"duration\":600,\"arrivalRate\":20}]}}",
+    "-o",
+    "/results/normal-constante-20vu-600s-20261114T063656427326Z-29b5c9ff.json"
+  ],
+  "nota": "Configuracion local; no certifica configuracion efectiva ni salud del cluster."
+}

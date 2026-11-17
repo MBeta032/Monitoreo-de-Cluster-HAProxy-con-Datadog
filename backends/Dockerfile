@@ -18,10 +18,15 @@ RUN chown -R appuser:appgroup /app
 
 USER appuser
 
+# Carpeta donde prometheus-client guarda las métricas de cada worker (modo multiproceso).
+# gunicorn.conf.py la crea y la vacía al arrancar.
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+
 EXPOSE 5000
 
-# Healthcheck nativo sin instalar curl en la imagen
+# Healthcheck nativo sin instalar curl en la imagen.
+# El shell del contenedor reemplaza ${PORT:-5000} al ejecutarlo (5000 si PORT no está definida).
 HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')" || exit 1
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-5000}/health')" || exit 1
 
 CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:app"]

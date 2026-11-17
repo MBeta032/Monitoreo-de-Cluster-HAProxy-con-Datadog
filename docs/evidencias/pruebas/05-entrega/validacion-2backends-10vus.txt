@@ -1,0 +1,84 @@
+# Validación: 2 backends (backend3 detenido) con 10 VU/s durante 30 s (flujo autenticado de pico-datadog.yml, etiqueta test:validacion-2backends)
+20:13:23Z / 15:13:23 local | ORDEN: docker compose stop backend3
+ Container backend3 Stopping 
+ Container backend3 Stopped 
+20:14:01Z / 15:14:01 local | HAProxy: backend3 UP
+20:14:01Z / 15:14:02 local | INICIO carga 10 VU/s x 30 s
+== docker stats a los ~20 s ==
+haproxy-telematicos-artillery-run-7afd70923bdd 852.4MiB / 4.742GiB 103.87%
+datadog-agent 286.9MiB / 4.742GiB 5.30%
+haproxy 77.1MiB / 4.742GiB 0.30%
+backend2 84.5MiB / 384MiB 0.32%
+backend1 84.66MiB / 384MiB 0.35%
+db 82.63MiB / 4.742GiB 0.02%
+20:16:57Z / 15:16:57 local | FIN carga
+20:16:57Z / 15:16:57 local | ORDEN: docker compose start backend3
+ Container backend3 Starting 
+ Container backend3 Started 
+20:17:01Z / 15:17:01 local | HAProxy: backend3 UP
+
+== Resumen de Artillery ==
+Summary report @ 20:16:53(+0000)
+--------------------------------
+
+errors.ERR_SOCKET_TIMEOUT: ..................................................... 16
+errors.JJ_eventos_HTTP_503: .................................................... 99
+errors.JJ_login_HTTP_503: ...................................................... 101
+errors.JJ_mis_reservas_HTTP_503: ............................................... 7
+errors.JJ_sillas_HTTP_503: ..................................................... 35
+http.codes.200: ................................................................ 362
+http.codes.503: ................................................................ 242
+http.downloaded_bytes: ......................................................... 9343777
+http.request_rate: ............................................................. 10/sec
+http.requests: ................................................................. 620
+http.response_time:
+  median: ...................................................................... 125.2
+  p95: ......................................................................... 23162.4
+http.response_time.2xx:
+  median: ...................................................................... 6312.2
+  p95: ......................................................................... 25598.5
+http.response_time.5xx:
+  median: ...................................................................... 1
+  p95: ......................................................................... 7.9
+http.responses: ................................................................ 604
+jj.eventos.http_503: ........................................................... 99
+jj.flujo_ok: ................................................................... 42
+jj.login.http_503: ............................................................. 101
+jj.login_ok: ................................................................... 186
+jj.mis_reservas.http_503: ...................................................... 7
+jj.sillas.http_503: ............................................................ 35
+plugins.metrics-by-endpoint.eventos.codes.200: ................................. 85
+plugins.metrics-by-endpoint.eventos.codes.503: ................................. 99
+plugins.metrics-by-endpoint.eventos.errors.ERR_SOCKET_TIMEOUT: ................. 2
+plugins.metrics-by-endpoint.login.codes.200: ................................... 186
+plugins.metrics-by-endpoint.login.codes.503: ................................... 101
+plugins.metrics-by-endpoint.login.errors.ERR_SOCKET_TIMEOUT: ................... 13
+plugins.metrics-by-endpoint.mis_reservas.codes.200: ............................ 42
+plugins.metrics-by-endpoint.mis_reservas.codes.503: ............................ 7
+plugins.metrics-by-endpoint.response_time.eventos:
+  median: ...................................................................... 10.1
+  p95: ......................................................................... 17859.2
+plugins.metrics-by-endpoint.response_time.login:
+  median: ...................................................................... 6064.7
+  p95: ......................................................................... 26115.6
+plugins.metrics-by-endpoint.response_time.mis_reservas:
+  median: ...................................................................... 77.5
+  p95: ......................................................................... 295.9
+plugins.metrics-by-endpoint.response_time.sillas:
+  median: ...................................................................... 55.2
+  p95: ......................................................................... 19737.6
+plugins.metrics-by-endpoint.sillas.codes.200: .................................. 49
+plugins.metrics-by-endpoint.sillas.codes.503: .................................. 35
+plugins.metrics-by-endpoint.sillas.errors.ERR_SOCKET_TIMEOUT: .................. 1
+vusers.completed: .............................................................. 42
+vusers.created: ................................................................ 300
+vusers.created_by_name.Taquilla autenticada: ................................... 300
+vusers.failed: ................................................................. 258
+vusers.session_length:
+  median: ...................................................................... 26643.2
+  p95: ......................................................................... 30040.3
+
+## Nota del Agente C (añadida a las 20:24Z tras revisar)
+- Las líneas "HAProxy: backend3 UP/DOWN" de arriba NO son fiables: en ese momento HAProxy tenía las IPs cruzadas (ver hallazgo-ips-haproxy.txt). El servidor "backend3" de HAProxy apuntaba al contenedor backend1, y el contenedor backend3 detenido era el servidor "backend2" de HAProxy (lo marcó DOWN L4CON). La prueba sí fue con 2 backends vivos de 3.
+- Lectura del resultado: con 2 backends (1 CPU cada uno) a 10 VU/s con login, la CPU se satura, los chequeos de salud de HAProxy vencen (L7TOUT, visto a las 20:16:10Z), HAProxy marca DOWN también a los backends sanos y responde 503 sin servidor (mediana del 5xx: 1 ms). 242 de 604 respuestas fueron 503 (40 %), 16 ERR_SOCKET_TIMEOUT, 258 de 300 VU fallidos.
+- Consecuencia para la demo: no repetir la caída de un backend (P3) mientras corre pico-datadog.yml. Para P3 usar falla.yml (solo lectura, 20 req/s, medido por Sharon sin degradación).

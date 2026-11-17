@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Cartelera{% endblock %} - Taquilla Sucursal</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <header class="site-header">
+    <div class="header-content">
+      <a class="brand" href="{{ url_for('index') }}">
+        <span class="brand-mark">TS</span>
+        <span class="brand-name">Taquilla Sucursal</span>
+      </a>
+
+      <nav class="main-nav" aria-label="Principal">
+        <a href="{{ url_for('index') }}">Cartelera</a>
+        <a href="{{ url_for('reservations_page') }}">Mis reservas</a>
+      </nav>
+
+      <div class="user-nav">
+        {% if current_user %}
+        <span class="user-initials" aria-hidden="true">{{ current_user.name | initials }}</span>
+        <span class="user-name">{{ current_user.name }}</span>
+        <form method="post" action="{{ url_for('logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="link-button">Cerrar sesión</button>
+        </form>
+        {% else %}
+        <a class="button-secondary" href="{{ header_login_url }}">Iniciar sesión</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Muestra qué backend atendió la página: al recargar se ve el balanceo de HAProxy -->
+  <footer class="site-footer">
+    Atendido por <strong>{{ instance_name }}</strong>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

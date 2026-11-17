@@ -1,0 +1,35 @@
+# Carga constante de solo lectura para la prueba de caída de un backend (falla.sh).
+# Sin inicio de sesión: así el costo del hash de contraseñas no tapa el efecto de la caída.
+config:
+  target: "http://haproxy:8080"
+  phases:
+    - duration: 30
+      arrivalRate: 5
+      rampTo: 30
+      name: "calentamiento"
+    - duration: 330
+      arrivalRate: 30
+      name: "meseta"
+  plugins:
+    publish-metrics:
+      - type: datadog
+        host: datadog-agent
+        port: 8125
+        prefix: "artillery."
+        tags:
+          - "test:falla"
+        event:
+          title: "Artillery falla"
+          text: "Prueba de carga con caída y recuperación de un backend"
+          priority: normal
+          tags:
+            - "test:falla"
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  - name: "cartelera"
+    flow:
+      - get:
+          url: "/api/events"
+          name: "cartelera"

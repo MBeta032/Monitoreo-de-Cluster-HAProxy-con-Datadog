@@ -9,3 +9,20 @@ desktop.ini
 .DS_Store
 .vscode/
 *.log
+
+# Cachés que crean Python y pytest al correr las pruebas
+__pycache__/
+.pytest_cache/
+
+# Configuración local de Claude Code (permisos de esta máquina)
+.claude/settings.local.json
+
+# Entrega y evidencias de JJ
+!artillery/corridas/*/consola.log
+!artillery/campanas/*/*/consola.log
+.venv-jj/
+__pycache__/
+*.bak
+
+# Salidas nuevas de Artillery (lo ya versionado en esta carpeta se conserva)
+artillery/resultados/

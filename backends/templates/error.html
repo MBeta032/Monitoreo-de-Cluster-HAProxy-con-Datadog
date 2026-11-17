@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{# Página para los errores 403, 404 y 503 de las páginas web (la API responde JSON) #}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<section class="card error-box">
+  <p class="error-code">{{ status_code }}</p>
+  <h1 class="page-title">{{ title }}</h1>
+  <p>{{ message }}</p>
+  <a class="button-primary" href="{{ url_for('index') }}">Volver a la cartelera</a>
+</section>
+{% endblock %}
