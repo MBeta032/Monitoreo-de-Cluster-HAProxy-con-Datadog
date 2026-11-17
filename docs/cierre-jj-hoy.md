@@ -10,7 +10,7 @@ Las pruebas anteriores del backend simple se conservan como históricas. No prue
 
 ## Ejecución directa con Docker, sin Python en el host
 
-El wrapper `ejecutar_pruebas.sh` y la campaña automatizada requieren Python 3 en el host. Artillery ejecutado directamente utiliza el runtime de su imagen y no requiere Python en el host.
+`ejecutar_pruebas.sh` ahora corre Artillery en su contenedor y no requiere Python en el host (`bash artillery/ejecutar_pruebas.sh <escenario>`). La campaña automatizada original (`cierre_hoy.py`, con `--tasa`, `--duracion` y `--patron`) quedó como histórica: su procedimiento está en [`docs/historico-jj/`](historico-jj/procedimiento-original.md). Artillery ejecutado directamente utiliza el runtime de su imagen y no requiere Python en el host.
 
 Desde la raíz de un clon limpio, copia `.env.example` a `.env` sin sobrescribir un archivo existente. Completa las variables de infraestructura siguiendo el README (incluida una SECRET_KEY aleatoria y las contraseñas de la instalación), además de:
 
