@@ -288,7 +288,7 @@ Antes de seguir, abre **Docker Desktop** y espera a que diga que está corriendo
    | `DD_POSTGRES_PASSWORD` | Sí | La segunda contraseña del paso 5 |
    | `SECRET_KEY` | Sí | Las 64 letras y números del paso 4 ([por qué](#63-sesión-en-3-backends)) |
    | `DD_APP_KEY` | No | Solo para `analizar_datadog.py` ([10.9](#109-analizar-una-corrida-con-las-métricas-de-datadog)) |
-   | `JJ_EMAIL` · `JJ_PASSWORD` | No | Solo para la campaña de la [sección 9](#9-pruebas-de-carga); una cuenta de prueba de [6.1](#61-qué-hace) |
+   | `JJ_EMAIL` · `JJ_PASSWORD` | Sí, para Artillery | Ya vienen llenas con la cuenta de prueba `demo@taquilla.test` / `Taquilla2026!` ([6.1](#61-qué-hace)); déjalas así. Las necesitan `normal.yml`, `pico.yml` y `pico-datadog.yml`: sin ellas, todos los usuarios virtuales fallan con `JJ_CREDENCIALES_AUSENTES`. Si tu `.env` es anterior, agrégale estas dos líneas |
    | `POSTGRES_DB` · `POSTGRES_USER` · `BACKEND1_WORKERS` a `BACKEND3_WORKERS` · `JJ_EVENT_ID` | No | Déjalas como vienen |
 
 7. Comprobar que no falta ninguna variable obligatoria (no muestra los valores):
